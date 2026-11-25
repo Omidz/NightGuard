@@ -35,7 +35,7 @@ try {
     if ($blocked) { throw $blocked }
 
     # Trusted-person mode: every change needs the code
-    if ($current) { Assert-NGCode $Code }
+    Assert-NGCode $Code   # does nothing when trusted-person mode is off
 
     # Upgrading from the old name (Bedtime Lock)? Remove it; its settings carry over.
     if (Test-Path $NGLegacyDir) {

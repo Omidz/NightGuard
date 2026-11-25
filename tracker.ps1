@@ -49,6 +49,7 @@ try {
     if (Test-NGSafeMode) { exit 0 }
     $cfg = Get-NGConfig
     if (-not $cfg -or -not $cfg.ScreenTime.Enabled -or (Test-NGExpired $cfg)) { exit 0 }
+    if (Get-NGUnsafeReason $cfg) { exit 0 }
     $st = $cfg.ScreenTime
 
     $now      = Get-Date

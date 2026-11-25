@@ -94,7 +94,7 @@ Turn them on in the **Screen time** tab.
 - **Screen time** counts every minute you're signed in and the screen isn't locked. When it runs out, NightGuard **locks** the PC (default), **shuts it down**, or just **nags** you, your choice.
 - **The day resets at 4 AM**, not midnight, so that 1 AM "quick game" counts toward the evening it belongs to. Nice try.
 - **What counts as a game?** Anything running from a game folder (Steam, Epic, Xbox, GOG, Riot, Ubisoft, EA and Battle.net folders are pre-filled), plus any extra program names you add. Add your own library folders, such as `D:\SteamLibrary\steamapps\common`.
-- Windows' own programs are never counted or closed, and screen time can't be set below 30 minutes, so the PC never becomes unusable.
+- Windows' own programs are never counted or closed, and screen time can't be set below 30 minutes. Heads-up: once today's screen time is used up with **Lock** or **Shutdown**, the PC stays locked or off until the day resets (4 AM by default). That's the deal you made with yourself. Safe Mode still works if you ever really need in.
 
 ## 🔐 Trusted-person mode
 
@@ -140,6 +140,7 @@ NightGuard was built to be strict at night and harmless otherwise:
 - It only creates **its own scheduled tasks** (all in a `NightGuard` folder in Task Scheduler), **its own firewall rules** (group `NightGuard`), **one marked section in the hosts file**, its folder in `C:\ProgramData\NightGuard`, and Start Menu shortcuts. Nothing touches boot settings, drivers, accounts, or your network setup.
 - Settings that could cause a shutdown loop are refused: a night can be at most 16 hours, and there must be at least 6 free hours between nights.
 - There's always a countdown of at least 15 seconds before anything happens.
+- **Damaged settings or a wrong clock?** NightGuard does nothing rather than risk a shutdown loop. If the settings file can't be read, or the clock is earlier than when the settings were saved (for example after a BIOS reset), it stands down and writes why in the log.
 - **Safe Mode is always safe:** NightGuard never acts in Safe Mode.
 - If blocking hits an error, it removes the blocks rather than leaving things half-blocked.
 

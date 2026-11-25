@@ -16,6 +16,10 @@ if (Test-NGExpired $cfg) {
     exit 0
 }
 
+# Invalid settings or a wrong clock: do nothing rather than risk a shutdown loop
+$unsafe = Get-NGUnsafeReason $cfg
+if ($unsafe) { Write-NGLog "not enforcing: $unsafe"; exit 0 }
+
 $night = Get-NGCurrentNight $cfg
 if (-not $night) { exit 0 }
 
