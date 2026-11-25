@@ -13,7 +13,6 @@ if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
 }
 
 $Host.UI.RawUI.WindowTitle = 'NightGuard'
-$SLDir = Join-Path $env:ProgramData 'ScreenLimits'
 
 # ============================================================================
 # Small input helpers
@@ -109,7 +108,7 @@ function Show-Header {
             Say ("Blocking   : {0} sites, {1} apps/folders ({2})" -f @($cfg.Blocking.Sites).Count, @($cfg.Blocking.Apps).Count, $bs)
         }
     }
-    if (Test-Path (Join-Path $SLDir 'config.json')) { Say 'Screen limits tool: installed' DarkGray }
+    if ($cfg -and $cfg.ScreenTime.Enabled) { foreach ($l in ((Get-NGUsageText $cfg) -split "`r`n")) { Say $l DarkGray } }
     Write-Host ''
 }
 
@@ -398,26 +397,6 @@ function Invoke-Uninstall {
     if (-not (Get-NGConfig) -and -not (Test-Path $PSCommandPath)) { exit }
 }
 
-function Show-SLUsage {
-    $script = Join-Path $SLDir 'Show-ScreenLimits.ps1'
-    Clear-Host
-    if (Test-Path $script) { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script }
-    else { Say 'The screen limits tool is not installed.' Yellow }
-    Pause-Menu
-}
-
-function Edit-SLLimits {
-    $cfgFile = Join-Path $SLDir 'config.json'
-    if (Test-Path $cfgFile) {
-        Say 'Opening the screen limits settings in Notepad. Changes apply within a minute after you save.'
-        Start-Process notepad.exe -ArgumentList "`"$cfgFile`""
-        Start-Sleep -Seconds 2
-    } else {
-        Say 'The screen limits tool is not installed.' Yellow
-        Pause-Menu
-    }
-}
-
 # ============================================================================
 # Main menu
 # ============================================================================
@@ -429,11 +408,7 @@ while ($true) {
         Say '[2]  Details (schedule, tasks, log)'
         Say '[3]  Preview popups'
         Say '[4]  Uninstall'
-        if (Test-Path (Join-Path $SLDir 'config.json')) {
-            Say '[5]  Screen limits: today''s usage'
-            Say '[6]  Screen limits: edit limits'
-        }
-        Say '[7]  Open the windowed app (blocking and trusted person are set up there)'
+        Say '[5]  Open the windowed app (blocking, screen time and trusted person are set up there)'
         Say '[0]  Exit'
         Write-Host ''
         switch (Read-Host '   Choose') {
@@ -441,9 +416,7 @@ while ($true) {
             '2' { Show-Details }
             '3' { Preview-Popups }
             '4' { Invoke-Uninstall }
-            '5' { Show-SLUsage }
-            '6' { Edit-SLLimits }
-            '7' { Start-Process powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', "`"$(Join-Path $PSScriptRoot 'gui.ps1')`""); exit }
+            '5' { Start-Process powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', "`"$(Join-Path $PSScriptRoot 'gui.ps1')`""); exit }
             '0' { exit }
         }
     } catch {

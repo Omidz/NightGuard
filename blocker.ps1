@@ -7,8 +7,9 @@
 
 try {
     $cfg = Get-NGConfig
-    if (-not $cfg -or (Test-NGSafeMode)) {
-        if (Clear-NGBlocks) { Write-NGLog 'blocking removed (no settings or Safe Mode)' }
+    $unsafe = if (Test-NGSafeMode) { 'Safe Mode' } else { Get-NGUnsafeReason $cfg }
+    if ($unsafe) {
+        if (Clear-NGBlocks) { Write-NGLog "blocking removed ($unsafe)" }
         exit 0
     }
     $r = Update-NGBlocking $cfg
