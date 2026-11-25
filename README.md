@@ -14,6 +14,7 @@ NightGuard warns you before bedtime, then **shuts your PC down** (or puts it to 
 - 🔌 **Enforces bedtime.** Shutdown, sleep, hibernate, lock or sign out, with a short countdown so you can save.
 - 🔁 **Doesn't fall for tricks.** Turn the PC back on during the night? It checks every few minutes and at every startup.
 - 📅 **Different bedtime per night.** Strict on school or work nights, chill on Friday.
+- 🎮 **Daily game and screen time budgets** (optional). "1 hour of games on weekdays" actually means 1 hour. Then the games close. Rude, but fair.
 - 🚫 **Blocks distractions on a schedule** (optional). Social media sites and apps like Discord or Steam, during bedtime or during your focus hours.
 - 🔐 **Trusted-person mode** (optional). Give an 8-digit code to a friend or parent. Without it, you can't change settings or uninstall. No more "I'll just disable it tonight".
 - 🌘 **Night mode.** In the last hour before bedtime, settings are locked. Past-you made a decision. Present-you doesn't get a vote.
@@ -67,7 +68,7 @@ All of this is in the NightGuard window. Nothing changes until you click **Save 
 | **Bedtime action** | Shutdown, Sleep, Hibernate, Lock or Sign out. Countdown length, how often it repeats, night mode length, end date. | Shutdown, 60 s countdown, repeats every 5 min |
 | **Block sites and apps** | Websites, apps or whole folders to block, and when | Off (a social media list is ready to go) |
 | **Trusted person** | Turn on the code lock | Off |
-| **Screen time** | Shows your daily game and screen time, if the Screen Limits add-on is installed | — |
+| **Screen time** | Daily game and screen time budgets (weekdays and weekends), warnings, what happens when time runs out, which programs count as games | Off (1 h games / 4 h screen on weekdays, 2 h / 6 h at weekends when you turn it on) |
 
 **How nights are named:** after the evening they start. A bedtime before 12:00 counts as *after midnight*, so "Mon 00:30" means 12:30 AM, early Tuesday.
 
@@ -84,6 +85,16 @@ All of this is in the NightGuard window. Nothing changes until you click **Save 
 | Lock | 🪶 | Just locks the screen. Fine if you only need a nudge. |
 
 ---
+
+## 🎮 Screen time limits
+
+Turn them on in the **Screen time** tab.
+
+- **Game time** counts while a game is running and you're at the screen. It warns you at 15, 5 and 1 minutes left. When it's used up, games (and optionally launchers like Steam) are closed, and closed again if you reopen them.
+- **Screen time** counts every minute you're signed in and the screen isn't locked. When it runs out, NightGuard **locks** the PC (default), **shuts it down**, or just **nags** you, your choice.
+- **The day resets at 4 AM**, not midnight, so that 1 AM "quick game" counts toward the evening it belongs to. Nice try.
+- **What counts as a game?** Anything running from a game folder (Steam, Epic, Xbox, GOG, Riot, Ubisoft, EA and Battle.net folders are pre-filled), plus any extra program names you add. Add your own library folders, such as `D:\SteamLibrary\steamapps\common`.
+- Windows' own programs are never counted or closed, and screen time can't be set below 30 minutes, so the PC never becomes unusable.
 
 ## 🔐 Trusted-person mode
 
@@ -126,7 +137,7 @@ Things that still work without the code, so you're never truly stuck:
 
 NightGuard was built to be strict at night and harmless otherwise:
 
-- It only creates **its own scheduled tasks**, **its own firewall rules** (group `NightGuard`), **one marked section in the hosts file**, its folder in `C:\ProgramData\NightGuard`, and Start Menu shortcuts. Nothing touches boot settings, drivers, accounts, or your network setup.
+- It only creates **its own scheduled tasks** (all in a `NightGuard` folder in Task Scheduler), **its own firewall rules** (group `NightGuard`), **one marked section in the hosts file**, its folder in `C:\ProgramData\NightGuard`, and Start Menu shortcuts. Nothing touches boot settings, drivers, accounts, or your network setup.
 - Settings that could cause a shutdown loop are refused: a night can be at most 16 hours, and there must be at least 6 free hours between nights.
 - There's always a countdown of at least 15 seconds before anything happens.
 - **Safe Mode is always safe:** NightGuard never acts in Safe Mode.
@@ -175,11 +186,13 @@ Something weird? [Open an issue](../../issues). Bug reports from fellow procrast
 | `session.ps1` | Shows the countdown, and locks or signs out |
 | `warn.ps1` | The warning popups |
 | `blocker.ps1` | Turns site and app blocking on and off |
+| `tracker.ps1` | Counts game and screen time every minute |
+| `notify.ps1` | Screen time popups |
 | `common.ps1` | Shared code. The top of the file documents every setting. |
 
 Settings are saved in `C:\ProgramData\NightGuard\config.json`, and there's a log in `log.txt` next to it.
 
-**Upgrading from "Bedtime Lock"** (NightGuard's old name)? Just install NightGuard. It carries over your settings and removes the old version.
+**Upgrading from "Bedtime Lock"** (NightGuard's old name) or the separate **Screen Limits** tool? Just install NightGuard. It carries over your settings (and today's usage) and removes the old versions.
 
 ---
 

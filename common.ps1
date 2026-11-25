@@ -13,6 +13,14 @@
 #   EndDate           yyyy-MM-dd: last night that is locked. The lock removes itself after it. null = never.
 #   Blocking          { Enabled, DuringBedtime, Sites[], Apps[], Windows[ {Days[], From, To} ] }
 #                     Sites are blocked in the hosts file, Apps (exe files or folders) with Windows Firewall.
+#   ScreenTime        Daily game and screen time budgets:
+#                     { Enabled, ResetHour (0-23, the hour a new day starts),
+#                       GameMinutesWeekday, GameMinutesWeekend (0 = no limit, else 5-1440),
+#                       ScreenMinutesWeekday, ScreenMinutesWeekend (0 = no limit, else 30-1440),
+#                       WarnAtMinutesLeft[] (1-120), LimitAction (Lock | Shutdown | Warn),
+#                       ShutdownGraceMinutes (1-10), CloseLaunchers,
+#                       GameFolders[] (anything running from these counts as a game),
+#                       GameProcesses[], IgnoreProcesses[], LauncherProcesses[] (names without .exe) }
 #
 # Trusted-person mode keeps a salted hash of the 8-digit code in trusted.json (admins only).
 # There is no recovery: without the code, settings and uninstall stay locked.
@@ -36,10 +44,15 @@ $NGHosts     = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
 $NGHostsBegin = "# >>> $NGAppName BEGIN - managed by $NGAppName, removed automatically"
 $NGHostsEnd   = "# <<< $NGAppName END"
 $NGFwGroup   = $NGAppName
-$NGScripts   = @('common.ps1', 'enforce.ps1', 'session.ps1', 'warn.ps1', 'blocker.ps1', 'install.ps1', 'uninstall.ps1', 'menu.ps1', 'gui.ps1', "$NGAppName.cmd", 'TextMenu.cmd')
+$NGScripts   = @('common.ps1', 'enforce.ps1', 'session.ps1', 'warn.ps1', 'blocker.ps1', 'tracker.ps1', 'notify.ps1', 'install.ps1', 'uninstall.ps1', 'menu.ps1', 'gui.ps1', "$NGAppName.cmd", 'TextMenu.cmd')
 # Earlier name of this tool; old installs are migrated and removed on install
 $NGLegacyName = 'BedtimeLock'
 $NGLegacyDir  = Join-Path $env:ProgramData $NGLegacyName
+# The separate Screen Limits add-on, now built in; old installs are migrated and removed
+$NGOldSLName  = 'ScreenLimits'
+$NGOldSLDir   = Join-Path $env:ProgramData $NGOldSLName
+$NGScreenActions = @('Lock', 'Shutdown', 'Warn')
+$NGProcRegex  = '^[\w .+()\-]{1,100}$'
 $NGSocialPreset = @('instagram.com', 'facebook.com', 'tiktok.com', 'x.com', 'twitter.com', 'reddit.com', 'youtube.com', 'snapchat.com', 'twitch.tv', 'pinterest.com')
 # Never block these: Windows, updates, security and sign-in would break
 $NGProtectedDomains = @('microsoft.com', 'windows.com', 'windowsupdate.com', 'live.com', 'microsoftonline.com', 'msftconnecttest.com',
@@ -68,6 +81,59 @@ function New-NGDefaultBlocking {
     return [pscustomobject]@{ Enabled = $false; DuringBedtime = $true; Sites = $NGSocialPreset; Apps = @(); Windows = @() }
 }
 
+function New-NGDefaultScreenTime {
+    return [pscustomobject]@{
+        Enabled = $false; ResetHour = 4
+        GameMinutesWeekday = 60; GameMinutesWeekend = 120
+        ScreenMinutesWeekday = 240; ScreenMinutesWeekend = 360
+        WarnAtMinutesLeft = @(15, 5, 1); LimitAction = 'Lock'; ShutdownGraceMinutes = 2; CloseLaunchers = $true
+        GameFolders = @(
+            'C:\Program Files (x86)\Steam\steamapps\common', 'C:\Program Files\Steam\steamapps\common',
+            'D:\SteamLibrary\steamapps\common', 'E:\SteamLibrary\steamapps\common',
+            'C:\Program Files\Epic Games', 'D:\Epic Games', 'C:\XboxGames', 'D:\XboxGames',
+            'C:\Program Files (x86)\GOG Galaxy\Games', 'C:\GOG Games', 'C:\Riot Games',
+            'C:\Program Files (x86)\Ubisoft\Ubisoft Game Launcher\games', 'C:\Program Files\EA Games',
+            'C:\Program Files (x86)\Battle.net\Games')
+        GameProcesses = @('League of Legends', 'VALORANT-Win64-Shipping', 'FortniteClient-Win64-Shipping', 'cs2', 'dota2',
+            'RobloxPlayerBeta', 'Minecraft.Windows', 'javaw', 'GTA5', 'RocketLeague', 'r5apex', 'Overwatch', 'eldenring')
+        IgnoreProcesses = @('steam', 'steamwebhelper', 'steamservice', 'EpicGamesLauncher', 'EpicWebHelper', 'UnrealCEFSubProcess',
+            'CrashReportClient', 'UnityCrashHandler64', 'UnityCrashHandler32', 'GameBar', 'GameBarFTServer', 'XboxPcApp',
+            'WindowsTerminal', 'Microsoft.Photos', 'Calculator', 'CalculatorApp', 'Notepad', 'msedge', 'Spotify', 'WhatsApp', 'Teams', 'ms-teams')
+        LauncherProcesses = @('steam', 'steamwebhelper', 'EpicGamesLauncher', 'EpicWebHelper', 'GalaxyClient', 'Battle.net',
+            'EADesktop', 'upc', 'RiotClientServices', 'XboxPcApp')
+    }
+}
+
+# Turns an old Screen Limits config.json into NightGuard's ScreenTime section (turned on).
+function Convert-NGOldScreenLimits($Old) {
+    $st = New-NGDefaultScreenTime
+    foreach ($k in 'ResetHour', 'GameMinutesWeekday', 'GameMinutesWeekend', 'ScreenMinutesWeekday', 'ScreenMinutesWeekend',
+                   'WarnAtMinutesLeft', 'ShutdownGraceMinutes', 'GameFolders', 'GameProcesses', 'IgnoreProcesses', 'LauncherProcesses') {
+        if ($null -ne $Old.$k) { $st.$k = $Old.$k }
+    }
+    if ($Old.ScreenLimitAction) { $st.LimitAction = [string]$Old.ScreenLimitAction }
+    if ($null -ne $Old.CloseLaunchersWhenGameLimitHit) { $st.CloseLaunchers = [bool]$Old.CloseLaunchersWhenGameLimitHit }
+    $st.Enabled = $true
+    return $st
+}
+
+# If the old Screen Limits add-on is installed, returns its settings as a ScreenTime section.
+function Get-NGOldScreenLimits {
+    $f = Join-Path $NGOldSLDir 'config.json'
+    if (Test-Path $f) { try { return Convert-NGOldScreenLimits (Get-Content $f -Raw | ConvertFrom-Json) } catch { } }
+    return $null
+}
+
+function Remove-NGOldScreenLimits {
+    Get-ScheduledTask -TaskPath "\$NGOldSLName\" -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
+    try {
+        $svc = New-Object -ComObject 'Schedule.Service'
+        $svc.Connect()
+        $svc.GetFolder('\').DeleteFolder($NGOldSLName, 0)
+    } catch { }
+    Remove-Item -Path $NGOldSLDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 function New-NGDefaultConfig {
     $sched = [ordered]@{}
     foreach ($d in $NGDays) { $sched[$d] = [pscustomobject]@{ Enabled = $true; Bedtime = '00:00'; Unlock = '06:00' } }
@@ -84,6 +150,7 @@ function New-NGDefaultConfig {
         NightModeMinutes = 60
         EndDate          = $null
         Blocking         = New-NGDefaultBlocking
+        ScreenTime       = New-NGDefaultScreenTime
     }
     return $cfg
 }
@@ -127,6 +194,27 @@ function ConvertTo-NGJson($Cfg) {
             Apps          = (ConvertTo-NGStringArray $b.Apps)
             Windows       = $wins
         }
+        ScreenTime       = $null
+    }
+    $st = $Cfg.ScreenTime
+    if (-not $st) { $st = New-NGDefaultScreenTime }
+    $warnAt = New-Object System.Collections.ArrayList
+    foreach ($m in (@($st.WarnAtMinutesLeft) | Where-Object { $null -ne $_ -and "$_".Trim() } | ForEach-Object { [int]$_ } | Sort-Object -Descending -Unique)) { [void]$warnAt.Add($m) }
+    $obj.ScreenTime = [ordered]@{
+        Enabled              = [bool]$st.Enabled
+        ResetHour            = [int]$st.ResetHour
+        GameMinutesWeekday   = [int]$st.GameMinutesWeekday
+        GameMinutesWeekend   = [int]$st.GameMinutesWeekend
+        ScreenMinutesWeekday = [int]$st.ScreenMinutesWeekday
+        ScreenMinutesWeekend = [int]$st.ScreenMinutesWeekend
+        WarnAtMinutesLeft    = $warnAt
+        LimitAction          = [string]$st.LimitAction
+        ShutdownGraceMinutes = [int]$st.ShutdownGraceMinutes
+        CloseLaunchers       = [bool]$st.CloseLaunchers
+        GameFolders          = (ConvertTo-NGStringArray $st.GameFolders)
+        GameProcesses        = (ConvertTo-NGStringArray ($st.GameProcesses | ForEach-Object { "$_" -replace '\.exe$', '' }))
+        IgnoreProcesses      = (ConvertTo-NGStringArray ($st.IgnoreProcesses | ForEach-Object { "$_" -replace '\.exe$', '' }))
+        LauncherProcesses    = (ConvertTo-NGStringArray ($st.LauncherProcesses | ForEach-Object { "$_" -replace '\.exe$', '' }))
     }
     return ($obj | ConvertTo-Json -Depth 8)
 }
@@ -247,6 +335,39 @@ function Test-NGConfig($Cfg) {
             foreach ($d in $days) { if ($NGDays -notcontains $d) { $errs += "Unknown day '$d' in a blocking time slot." } }
             if ($w.From -notmatch $NGTimeRegex -or $w.To -notmatch $NGTimeRegex) { $errs += "Blocking time slot '$($w.From)-$($w.To)' needs times like 09:00." }
             elseif ([timespan]::Parse($w.From) -eq [timespan]::Parse($w.To)) { $errs += "Blocking time slot $($w.From)-$($w.To) starts and ends at the same time." }
+        }
+    }
+
+    $st = $Cfg.ScreenTime
+    if ($st -and $st.Enabled) {
+        if ([int]$st.ResetHour -lt 0 -or [int]$st.ResetHour -gt 23) { $errs += 'Screen time: the new day must start at an hour from 0 to 23.' }
+        foreach ($k in 'GameMinutesWeekday', 'GameMinutesWeekend') {
+            $v = [int]$st.$k
+            if ($v -ne 0 -and ($v -lt 5 -or $v -gt 1440)) { $errs += "Screen time: game time must be 0 (no limit) or 5 to 1440 minutes (got $v)." }
+        }
+        foreach ($k in 'ScreenMinutesWeekday', 'ScreenMinutesWeekend') {
+            # Safety: at least 30 minutes, so the PC is never unusable for a whole day
+            $v = [int]$st.$k
+            if ($v -ne 0 -and ($v -lt 30 -or $v -gt 1440)) { $errs += "Screen time: screen time must be 0 (no limit) or 30 to 1440 minutes (got $v)." }
+        }
+        $wa = @($st.WarnAtMinutesLeft | Where-Object { $null -ne $_ })
+        if ($wa.Count -gt 6) { $errs += 'Screen time: at most 6 warnings.' }
+        foreach ($m in $wa) { if ([int]$m -lt 1 -or [int]$m -gt 120) { $errs += "Screen time: warnings must be 1 to 120 minutes before the limit (got $m)." } }
+        if ($NGScreenActions -notcontains [string]$st.LimitAction) { $errs += "Screen time: the action must be one of: $($NGScreenActions -join ', ')." }
+        if ([int]$st.ShutdownGraceMinutes -lt 1 -or [int]$st.ShutdownGraceMinutes -gt 10) { $errs += 'Screen time: shutdown notice must be 1 to 10 minutes.' }
+        $gf = @($st.GameFolders | Where-Object { $_ })
+        if ($gf.Count -gt 50) { $errs += 'Screen time: at most 50 game folders.' }
+        foreach ($f in $gf) {
+            if (-not [IO.Path]::IsPathRooted([string]$f)) { $errs += "Screen time: game folder '$f' must be a full path." }
+            elseif (Test-NGProtectedPath ([string]$f)) { $errs += "Screen time: '$f' can't be a game folder, because Windows runs from there." }
+        }
+        foreach ($k in 'GameProcesses', 'IgnoreProcesses', 'LauncherProcesses') {
+            $list = @($st.$k | Where-Object { $_ })
+            if ($list.Count -gt 200) { $errs += "Screen time: at most 200 entries in $k." }
+            foreach ($n in $list) {
+                if ("$n" -notmatch $NGProcRegex) { $errs += "Screen time: '$n' is not a program name (use the name from Task Manager, without .exe)." }
+                elseif ($NGNeverKill -contains "$n".ToLowerInvariant() -and $k -ne 'IgnoreProcesses') { $errs += "Screen time: '$n' is part of Windows and can't be treated as a game or launcher." }
+            }
         }
     }
     return , $errs
@@ -452,6 +573,51 @@ function Update-NGBlocking($Cfg) {
         if (Clear-NGBlocks) { return 'off' }
     }
     return $null
+}
+
+# ============================================================================
+# Screen time usage (written every minute by tracker.ps1)
+# ============================================================================
+$NGUsageFile  = Join-Path $NGDir 'usage.json'
+$NGNotifyFile = Join-Path $NGDir 'notify.json'
+# Never counted as games and never closed, whatever the settings say
+$NGNeverKill = @('explorer', 'dwm', 'csrss', 'winlogon', 'wininit', 'lsass', 'services', 'svchost', 'smss', 'logonui',
+                 'taskmgr', 'powershell', 'pwsh', 'cmd', 'conhost', 'sihost', 'fontdrvhost', 'ctfmon', 'runtimebroker',
+                 'searchhost', 'startmenuexperiencehost', 'shellexperiencehost', 'textinputhost', 'audiodg', 'msmpeng', 'securityhealthsystray')
+
+function Get-NGUsageDay($St, [datetime]$Now = (Get-Date)) { return $Now.AddHours(-[int]$St.ResetHour).Date }
+
+function Get-NGLimits($St, [datetime]$Day) {
+    $weekend = ($Day.DayOfWeek -eq 'Saturday' -or $Day.DayOfWeek -eq 'Sunday')
+    return [pscustomobject]@{
+        Game   = $(if ($weekend) { [int]$St.GameMinutesWeekend } else { [int]$St.GameMinutesWeekday })
+        Screen = $(if ($weekend) { [int]$St.ScreenMinutesWeekend } else { [int]$St.ScreenMinutesWeekday })
+    }
+}
+
+function Format-NGMinutes([double]$M) {
+    $m = [math]::Max(0, [math]::Round($M))
+    return ('{0}h {1:00}m' -f [math]::Floor($m / 60), ($m % 60))
+}
+
+function Get-NGUsageText($Cfg) {
+    $st = $Cfg.ScreenTime
+    if (-not $st -or -not $st.Enabled) { return 'Screen time limits are off.' }
+    $day = Get-NGUsageDay $st
+    $lim = Get-NGLimits $st $day
+    $game = 0.0; $screen = 0.0
+    if (Test-Path $NGUsageFile) {
+        try {
+            $u = Get-Content $NGUsageFile -Raw | ConvertFrom-Json
+            if ($u.Day -eq $day.ToString('yyyy-MM-dd')) { $game = [double]$u.GameMinutes; $screen = [double]$u.ScreenMinutes }
+        } catch { }
+    }
+    $line = {
+        param($Name, $Used, $Limit)
+        if ($Limit -le 0) { '{0,-7} used {1}   (no limit)' -f $Name, (Format-NGMinutes $Used) }
+        else { '{0,-7} used {1} of {2}   left {3}' -f $Name, (Format-NGMinutes $Used), (Format-NGMinutes $Limit), (Format-NGMinutes ($Limit - $Used)) }
+    }
+    return ("Today ({0}, resets at {1}:00)`r`n  {2}`r`n  {3}" -f $day.ToString('ddd d MMM'), $st.ResetHour, (& $line 'Games' $game $lim.Game), (& $line 'Screen' $screen $lim.Screen))
 }
 
 # ============================================================================

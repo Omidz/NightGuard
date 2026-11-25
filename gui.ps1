@@ -17,7 +17,6 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
-$SLDir = Join-Path $env:ProgramData 'ScreenLimits'
 $FontUI   = New-Object System.Drawing.Font('Segoe UI', 9)
 $FontBold = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
 $FontBig  = New-Object System.Drawing.Font('Segoe UI', 12, [System.Drawing.FontStyle]::Bold)
@@ -201,7 +200,6 @@ $bRefresh  = New-Ctl 'Button' $tStatus @{ Text = 'Refresh'; Location = (P 10 445
 $bPrevWarn = New-Ctl 'Button' $tStatus @{ Text = 'Preview warning'; Location = (P 120 445); Size = (S 130 32) }
 $bPrevCd   = New-Ctl 'Button' $tStatus @{ Text = 'Preview countdown'; Location = (P 260 445); Size = (S 140 32) }
 $bLog      = New-Ctl 'Button' $tStatus @{ Text = 'Open log'; Location = (P 410 445); Size = (S 100 32) }
-$bSLUsage  = New-Ctl 'Button' $tStatus @{ Text = 'Screen limits usage'; Location = (P 520 445); Size = (S 150 32); Visible = $false }
 $bUninst   = New-Ctl 'Button' $tStatus @{ Text = 'Uninstall'; Location = (P 730 445); Size = (S 100 32); ForeColor = $Red }
 
 function Get-StatusText {
@@ -231,6 +229,10 @@ function Get-StatusText {
         $now = if (Test-NGBlockActive $cfg) { 'BLOCKING NOW' } else { 'not right now' }
         & $add ("Blocking        : {0} sites, {1} apps/folders, {2}" -f @($cfg.Blocking.Sites).Count, @($cfg.Blocking.Apps).Count, $now)
     } else { & $add 'Blocking        : off' }
+    if ($cfg.ScreenTime.Enabled) {
+        & $add ''
+        foreach ($l in ((Get-NGUsageText $cfg) -split "`r`n")) { & $add $l }
+    }
     & $add ''
     & $add 'Scheduled tasks:'
     foreach ($task in @(Get-ScheduledTask -TaskPath $NGTaskPath -ErrorAction SilentlyContinue)) {
@@ -251,7 +253,6 @@ function Update-Status {
     $installed = [bool](Get-NGConfig)
     $btnSave.Text = if ($installed) { 'Save and apply' } else { 'Install' }
     $bUninst.Enabled = $installed
-    $bSLUsage.Visible = Test-Path (Join-Path $SLDir 'Show-ScreenLimits.ps1')
     Update-TrustTab
 }
 
@@ -481,29 +482,50 @@ $bTrustOff.Add_Click({ Safe {
 } })
 
 # ---------------------------------------------------------------- Screen time tab
-# Shows the Screen Limits add-on (daily game and screen time budgets) when it's installed.
-$lblScreen = New-Ctl 'Label' $tScreen @{ Location = (P 10 10); Size = (S 820 40) }
-$txtScreen = New-Ctl 'TextBox' $tScreen @{ Location = (P 10 56); Size = (S 820 370); Multiline = $true; ReadOnly = $true
-    ScrollBars = 'Vertical'; Font = $FontMono; BackColor = [System.Drawing.Color]::White }
-$bScrRefresh = New-Ctl 'Button' $tScreen @{ Text = 'Refresh'; Location = (P 10 440); Size = (S 100 32) }
-$bScrEdit    = New-Ctl 'Button' $tScreen @{ Text = 'Edit limits...'; Location = (P 120 440); Size = (S 120 32) }
+$chkST = New-Ctl 'CheckBox' $tScreen @{ Text = 'Turn on daily game and screen time limits'; Location = (P 10 10); Size = (S 400 24); Font = $FontBold }
+$lblUsage = New-Ctl 'Label' $tScreen @{ Location = (P 420 8); Size = (S 410 50); Font = $FontMono }
 
-function Update-ScreenTab {
-    $show = Join-Path $SLDir 'Show-ScreenLimits.ps1'
-    if (Test-Path $show) {
-        $lblScreen.Text = "Today's game and screen time. Limits are set in the Screen Limits settings file (Edit limits)."
-        $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $show 2>&1 | Out-String
-        $txtScreen.Text = $out.Trim()
-        $bScrEdit.Enabled = $true
-    } else {
-        $lblScreen.Text = 'Daily game and screen time limits are an optional add-on (Screen Limits). Install it and your usage shows up here.'
-        $txtScreen.Text = ''
-        $bScrEdit.Enabled = $false
-    }
+function New-STNum([string]$Label, [int]$X, [int]$Y, [int]$Min, [int]$Max) {
+    New-Ctl 'Label' $tScreen @{ Text = $Label; Location = (P $X ($Y + 3)); Size = (S 150 20) } | Out-Null
+    return (New-Ctl 'NumericUpDown' $tScreen @{ Location = (P ($X + 155) $Y); Size = (S 70 24); Minimum = $Min; Maximum = $Max })
 }
-$bScrRefresh.Add_Click({ Safe { Update-ScreenTab } })
-$bScrEdit.Add_Click({ Safe { Start-Process notepad.exe -ArgumentList "`"$(Join-Path $SLDir 'config.json')`"" } })
-$tabs.Add_SelectedIndexChanged({ if ($tabs.SelectedTab -eq $tScreen) { Safe { Update-ScreenTab } } })
+New-Ctl 'Label' $tScreen @{ Text = 'Minutes per day (0 = no limit):'; Location = (P 10 48); Size = (S 400 20); ForeColor = [System.Drawing.Color]::DimGray } | Out-Null
+$numGWd = New-STNum 'Games, weekdays' 10 72 0 1440
+$numGWe = New-STNum 'Games, weekends' 10 102 0 1440
+$numSWd = New-STNum 'Screen, weekdays' 260 72 0 1440
+$numSWe = New-STNum 'Screen, weekends' 260 102 0 1440
+$numReset = New-STNum 'New day starts at (hour)' 520 72 0 23
+$numGrace = New-STNum 'Shutdown notice (min)' 520 102 1 10
+
+New-Ctl 'Label' $tScreen @{ Text = 'When screen time runs out:'; Location = (P 10 143); Size = (S 160 20) } | Out-Null
+$cboST = New-Ctl 'ComboBox' $tScreen @{ Location = (P 175 140); Size = (S 110 24); DropDownStyle = 'DropDownList' }
+foreach ($a in $NGScreenActions) { [void]$cboST.Items.Add($a) }
+New-Ctl 'Label' $tScreen @{ Text = 'Warn at (minutes left):'; Location = (P 300 143); Size = (S 140 20) } | Out-Null
+$txtSTWarn = New-Ctl 'TextBox' $tScreen @{ Location = (P 445 140); Size = (S 100 24) }
+$chkLaunch = New-Ctl 'CheckBox' $tScreen @{ Text = 'Also close game launchers'; Location = (P 560 140); Size = (S 260 24) }
+
+function New-STList([string]$Label, [int]$X, [int]$W) {
+    New-Ctl 'Label' $tScreen @{ Text = $Label; Location = (P $X 176); Size = (S $W 20) } | Out-Null
+    return (New-Ctl 'TextBox' $tScreen @{ Location = (P $X 198); Size = (S $W 250); Multiline = $true; ScrollBars = 'Both'; WordWrap = $false; Font = $FontMono })
+}
+$txtGFolders = New-STList 'Game folders (one per line)' 10 290
+$txtGProcs   = New-STList 'Extra games (program names)' 310 170
+$txtIgnore   = New-STList 'Never count as games' 490 165
+$txtLaunch   = New-STList 'Launchers' 665 165
+$bAddGF = New-Ctl 'Button' $tScreen @{ Text = 'Add folder...'; Location = (P 10 454); Size = (S 110 28) }
+$bUsage = New-Ctl 'Button' $tScreen @{ Text = 'Refresh usage'; Location = (P 130 454); Size = (S 110 28) }
+New-Ctl 'Label' $tScreen @{ Location = (P 250 452); Size = (S 580 36); ForeColor = [System.Drawing.Color]::DimGray
+    Text = "Anything running from a game folder counts as a game. Program names are as in Task Manager > Details, without .exe. Windows' own programs are never closed." } | Out-Null
+
+$bAddGF.Add_Click({
+    $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+    $dlg.Description = 'Pick a folder where games are installed.'
+    if ($dlg.ShowDialog($form) -eq 'OK') {
+        if (Test-NGProtectedPath $dlg.SelectedPath) { Msg "That folder is part of Windows and can't be a game folder." 'Warning' }
+        else { $txtGFolders.Lines = @(@($txtGFolders.Lines | Where-Object { $_.Trim() }) + $dlg.SelectedPath) }
+    }
+})
+$bUsage.Add_Click({ Safe { $c = Get-NGConfig; $lblUsage.Text = $(if ($c) { Get-NGUsageText $c } else { '' }) } })
 
 # ============================================================================
 # First run: a few clicks to get going; everything else is on the tabs
@@ -585,6 +607,22 @@ function Load-Form($Cfg) {
     $txtSites.Lines = @($b.Sites | Where-Object { $_ })
     $lstApps.Items.Clear()
     foreach ($a in @($b.Apps | Where-Object { $_ })) { [void]$lstApps.Items.Add([string]$a) }
+    $st = $Cfg.ScreenTime
+    $chkST.Checked = [bool]$st.Enabled
+    $numGWd.Value = [math]::Min(1440, [math]::Max(0, [int]$st.GameMinutesWeekday))
+    $numGWe.Value = [math]::Min(1440, [math]::Max(0, [int]$st.GameMinutesWeekend))
+    $numSWd.Value = [math]::Min(1440, [math]::Max(0, [int]$st.ScreenMinutesWeekday))
+    $numSWe.Value = [math]::Min(1440, [math]::Max(0, [int]$st.ScreenMinutesWeekend))
+    $numReset.Value = [math]::Min(23, [math]::Max(0, [int]$st.ResetHour))
+    $numGrace.Value = [math]::Min(10, [math]::Max(1, [int]$st.ShutdownGraceMinutes))
+    $cboST.SelectedItem = [string]$st.LimitAction
+    $txtSTWarn.Text = (@($st.WarnAtMinutesLeft) -join ', ')
+    $chkLaunch.Checked = [bool]$st.CloseLaunchers
+    $txtGFolders.Lines = @($st.GameFolders | Where-Object { $_ })
+    $txtGProcs.Lines   = @($st.GameProcesses | Where-Object { $_ })
+    $txtIgnore.Lines   = @($st.IgnoreProcesses | Where-Object { $_ })
+    $txtLaunch.Lines   = @($st.LauncherProcesses | Where-Object { $_ })
+    $lblUsage.Text = $(if (Get-NGConfig) { Get-NGUsageText $Cfg } else { '' })
     $gridWin.Rows.Clear()
     foreach ($w in @($b.Windows | Where-Object { $_ })) {
         $vals = @()
@@ -633,6 +671,20 @@ function Read-Form {
             Apps = @($lstApps.Items | ForEach-Object { [string]$_ })
             Windows = $wins
         }
+        ScreenTime = [pscustomobject]@{
+            Enabled = $chkST.Checked
+            ResetHour = [int]$numReset.Value
+            GameMinutesWeekday = [int]$numGWd.Value; GameMinutesWeekend = [int]$numGWe.Value
+            ScreenMinutesWeekday = [int]$numSWd.Value; ScreenMinutesWeekend = [int]$numSWe.Value
+            WarnAtMinutesLeft = @($txtSTWarn.Text -split '[,;\s]+' | Where-Object { $_ } | ForEach-Object { $n = 0; if ([int]::TryParse($_, [ref]$n)) { $n } else { -1 } })
+            LimitAction = [string]$cboST.SelectedItem
+            ShutdownGraceMinutes = [int]$numGrace.Value
+            CloseLaunchers = $chkLaunch.Checked
+            GameFolders = @($txtGFolders.Lines | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+            GameProcesses = @($txtGProcs.Lines | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+            IgnoreProcesses = @($txtIgnore.Lines | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+            LauncherProcesses = @($txtLaunch.Lines | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        }
     }
     return (Copy-NGConfig $cfg)
 }
@@ -644,6 +696,10 @@ function Get-StartingConfig {
         if (Test-Path $legacy) { try { $cfg = Read-NGConfigFile $legacy } catch { } }
     }
     if (-not $cfg) { $cfg = Copy-NGConfig (New-NGDefaultConfig) }
+    if (-not $cfg.ScreenTime.Enabled) {
+        $oldSL = Get-NGOldScreenLimits   # carry over the old Screen Limits add-on
+        if ($oldSL) { $cfg.ScreenTime = $oldSL; $cfg = Copy-NGConfig $cfg }
+    }
     return $cfg
 }
 
@@ -701,9 +757,7 @@ $bLog.Add_Click({ Safe {
     $log = Join-Path $NGDir 'log.txt'
     if (Test-Path $log) { Start-Process notepad.exe -ArgumentList "`"$log`"" } else { Msg 'Nothing logged yet.' }
 } })
-$bSLUsage.Add_Click({ Safe {
-    Start-Process powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-File', "`"$(Join-Path $SLDir 'Show-ScreenLimits.ps1')`"")
-} })
+
 
 $bUninst.Add_Click({ Safe {
     $blk = Get-NGBlockedReason (Get-NGConfig); if ($blk) { throw $blk }
