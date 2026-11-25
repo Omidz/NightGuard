@@ -36,7 +36,7 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $v = '2.0.0'
+          $v = "2.0.${{ github.run_number }}"   # every CI build upgrades the previous one
           if ($env:GITHUB_REF -like 'refs/tags/v*') { $v = $env:GITHUB_REF_NAME.TrimStart('v') }
           "version=$v" >> $env:GITHUB_OUTPUT
 
