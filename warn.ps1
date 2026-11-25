@@ -7,7 +7,7 @@ Add-Type -AssemblyName System.Windows.Forms
 . (Join-Path $PSScriptRoot 'common.ps1')
 
 $cfgPath = Join-Path $PSScriptRoot 'config.json'
-$cfg = if (Test-Path $cfgPath) { Read-NGConfigFile $cfgPath } else { New-NGDefaultConfig }
+try { $cfg = if (Test-Path $cfgPath) { Read-NGConfigFile $cfgPath } else { New-NGDefaultConfig } } catch { exit 0 }
 $warnings = @($cfg.Warnings | Where-Object { $_ })
 if ($warnings.Count -eq 0) { exit 0 }
 

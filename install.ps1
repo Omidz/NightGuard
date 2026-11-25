@@ -35,7 +35,7 @@ try {
     if ($blocked) { throw $blocked }
 
     # Trusted-person mode: every change needs the code
-    if ($current) { Assert-NGCode $Code }
+    Assert-NGCode $Code   # does nothing when trusted-person mode is off
 
     # Upgrading from the old name (Bedtime Lock)? Remove it; its settings carry over.
     if (Test-Path $NGLegacyDir) {
@@ -47,6 +47,10 @@ try {
     elseif ($current)  { $cfg = $current }
     elseif ($legacyCfg) { $cfg = $legacyCfg }
     else               { $cfg = Copy-NGConfig (New-NGDefaultConfig) }
+
+    # Screen Limits add-on installed separately? Its limits move into NightGuard.
+    $oldSL = Get-NGOldScreenLimits
+    if ($oldSL -and -not $ConfigPath -and -not $cfg.ScreenTime.Enabled) { $cfg.ScreenTime = $oldSL; $cfg = Copy-NGConfig $cfg }
 
     $errs = Test-NGConfig $cfg
     if ($errs.Count -gt 0) { throw ("Settings have problems:`n  - " + ($errs -join "`n  - ")) }
@@ -142,6 +146,31 @@ try {
         -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
                     -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 5)) `
         -Description 'Turns NightGuard site and app blocking on and off on schedule. Installed by NightGuard.' | Out-Null
+
+    # --- Tasks 5 and 6: Screen time tracker (SYSTEM, every minute) and popups (user session)
+    if ($cfg.ScreenTime.Enabled) {
+        $everyMin = New-ScheduledTaskTrigger -Daily -At '00:00'
+        $everyMin.Repetition = (New-ScheduledTaskTrigger -Once -At '00:00' -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration (New-TimeSpan -Days 1)).Repetition
+        Register-ScheduledTask -TaskPath $NGTaskPath -TaskName 'Screen time tracker' `
+            -Action (New-NGAction 'tracker.ps1') -Trigger @($everyMin, $boot) -Principal $system `
+            -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
+                        -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 2)) `
+            -Description 'Counts daily game and screen time and enforces the limits. Installed by NightGuard.' | Out-Null
+        Register-ScheduledTask -TaskPath $NGTaskPath -TaskName 'Screen time notify' `
+            -Action (New-NGAction 'notify.ps1') -Principal $users `
+            -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+                        -MultipleInstances Parallel -ExecutionTimeLimit (New-TimeSpan -Minutes 5)) `
+            -Description 'Shows screen time popups. Installed by NightGuard.' | Out-Null
+    }
+
+    # Old Screen Limits add-on: keep today's usage, then remove it
+    if (Test-Path $NGOldSLDir) {
+        $oldUsage = Join-Path $NGOldSLDir 'state.json'
+        if ((Test-Path $oldUsage) -and -not (Test-Path $NGUsageFile)) { Copy-Item $oldUsage $NGUsageFile -Force }
+        Remove-NGOldScreenLimits
+        Write-Host 'Moved the separate Screen Limits add-on into NightGuard.'
+        Write-NGLog 'old Screen Limits add-on migrated and removed'
+    }
 
     # Apply blocking right away
     try {

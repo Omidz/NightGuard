@@ -7,9 +7,11 @@ param([switch]$Preview)
 
 . (Join-Path $PSScriptRoot 'common.ps1')
 $cfgPath = Join-Path $PSScriptRoot 'config.json'
-$cfg = if (Test-Path $cfgPath) { Read-NGConfigFile $cfgPath } else { New-NGDefaultConfig }
+try { $cfg = if (Test-Path $cfgPath) { Read-NGConfigFile $cfgPath } else { New-NGDefaultConfig } } catch { exit 0 }
 
 if (-not $Preview) {
+    if (Test-NGSafeMode) { exit 0 }
+    if (Get-NGUnsafeReason $cfg) { exit 0 }
     if (Test-NGExpired $cfg) { exit 0 }
     if (-not (Get-NGCurrentNight $cfg)) { exit 0 }
     if ($cfg.Action -eq 'Shutdown') { exit 0 }
