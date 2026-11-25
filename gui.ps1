@@ -21,7 +21,15 @@ $FontUI   = New-Object System.Drawing.Font('Segoe UI', 9)
 $FontBold = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
 $FontBig  = New-Object System.Drawing.Font('Segoe UI', 12, [System.Drawing.FontStyle]::Bold)
 $FontMono = New-Object System.Drawing.Font('Consolas', 10)
+$FontRow  = New-Object System.Drawing.Font('Segoe UI', 10)
+$FontRowB = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)
 $Red      = [System.Drawing.Color]::FromArgb(200, 30, 30)
+$Gray     = [System.Drawing.Color]::DimGray
+
+# Times are shown the way the Windows clock shows them: 12-hour (AM/PM) or 24-hour
+$Is12h   = [Globalization.CultureInfo]::CurrentCulture.DateTimeFormat.ShortTimePattern -match 't'
+$TimeFmt = if ($Is12h) { 'h:mm tt' } else { 'HH:mm' }
+$TimeHint = if ($Is12h) { 'Times use the 12-hour clock (AM / PM), same as your Windows clock.' } else { 'Times use the 24-hour clock (00:00 is midnight), same as your Windows clock.' }
 
 # ============================================================================
 # Small helpers
@@ -48,21 +56,18 @@ function Safe([scriptblock]$Block) {
     try { & $Block } catch { Msg $_.Exception.Message 'Error' }
 }
 
-function Add-Col($Grid, [string]$Type, [string]$Name, [string]$Header, [int]$Width, [bool]$ReadOnly = $false) {
-    $c = New-Object "System.Windows.Forms.DataGridView${Type}Column"
-    $c.Name = $Name; $c.HeaderText = $Header; $c.Width = $Width; $c.ReadOnly = $ReadOnly
-    $c.SortMode = 'NotSortable'
-    [void]$Grid.Columns.Add($c)
-    return $c
+# --- Time pickers: click the hour or minute (or AM/PM) and use the arrows, or type
+function New-TimePicker($Parent, [int]$X, [int]$Y, [string]$Value = '00:00') {
+    $t = New-Ctl 'DateTimePicker' $Parent @{ Location = (P $X $Y); Size = (S 112 28); Format = 'Custom'; CustomFormat = $TimeFmt; ShowUpDown = $true; Font = $FontRow }
+    Set-PickerTime $t $Value
+    return $t
 }
-
-function New-Grid($Parent, $Location, $Size, [bool]$AddRows) {
-    return New-Ctl 'DataGridView' $Parent @{
-        Location = $Location; Size = $Size; AllowUserToAddRows = $AddRows; AllowUserToDeleteRows = $AddRows
-        RowHeadersVisible = $false; AllowUserToResizeRows = $false; SelectionMode = 'FullRowSelect'
-        MultiSelect = $false; BackgroundColor = [System.Drawing.SystemColors]::Window; EditMode = 'EditOnEnter'
-    }
+function Set-PickerTime($Picker, [string]$HHmm) {
+    if ($HHmm -notmatch $NGTimeRegex) { $HHmm = '00:00' }
+    $Picker.Value = [datetime]::Today.Add([timespan]::Parse($HHmm))
 }
+function Get-PickerTime($Picker) { return $Picker.Value.ToString('HH:mm', $NGInv) }
+function Format-LocalTime([string]$HHmm) { return ([datetime]::Today.Add([timespan]::Parse($HHmm))).ToString($TimeFmt) }
 
 function Normalize-Time([string]$T) {
     $T = "$T".Trim()
@@ -175,41 +180,105 @@ function Get-CodeIfNeeded([string]$Why) {
 # ============================================================================
 # Main window
 # ============================================================================
-$script:form = New-Ctl 'Form' $null @{ Text = 'NightGuard'; Size = (S 880 660); StartPosition = 'CenterScreen'
+$script:form = New-Ctl 'Form' $null @{ Text = 'NightGuard'; Size = (S 1170 720); StartPosition = 'CenterScreen'
     FormBorderStyle = 'FixedSingle'; MaximizeBox = $false; Font = $FontUI }
-$tabs = New-Ctl 'TabControl' $form @{ Location = (P 8 8); Size = (S 850 560) }
+
+# The app is a step-by-step wizard: a list of steps on the left, one page at a time
+# on the right (tab pages with their tab headers hidden), and Back / Next at the bottom.
+$pnlSteps = New-Ctl 'Panel' $form @{ Location = (P 0 0); Size = (S 205 690); BackColor = [System.Drawing.Color]::FromArgb(28, 32, 52) }
+New-Ctl 'Label' $pnlSteps @{ Text = 'NightGuard'; Location = (P 18 18); Size = (S 180 32); ForeColor = [System.Drawing.Color]::White
+    Font = (New-Object System.Drawing.Font('Segoe UI', 15, [System.Drawing.FontStyle]::Bold)) } | Out-Null
+$lstSteps = New-Ctl 'ListBox' $pnlSteps @{ Location = (P 10 64); Size = (S 190 420); BorderStyle = 'None'; IntegralHeight = $false
+    BackColor = [System.Drawing.Color]::FromArgb(28, 32, 52); ForeColor = [System.Drawing.Color]::White
+    Font = (New-Object System.Drawing.Font('Segoe UI', 11)); ItemHeight = 34; DrawMode = 'OwnerDrawFixed' }
+$tabs = New-Ctl 'TabControl' $form @{ Location = (P 215 4); Size = (S 935 616); Appearance = 'FlatButtons'; ItemSize = (S 0 1); SizeMode = 'Fixed' }
 function New-Tab([string]$Title) { $t = New-Object System.Windows.Forms.TabPage $Title; $t.UseVisualStyleBackColor = $true; [void]$tabs.TabPages.Add($t); return $t }
 
-$tStatus = New-Tab 'Status'
-$tSched  = New-Tab 'Schedule'
+$tStatus = New-Tab 'Welcome'
+$tSched  = New-Tab 'Bedtimes'
 $tWarn   = New-Tab 'Warnings'
-$tAct    = New-Tab 'Bedtime action'
+$tAct    = New-Tab 'At bedtime'
+$tScreen = New-Tab 'Game and screen time'
 $tBlock  = New-Tab 'Block sites and apps'
 $tTrust  = New-Tab 'Trusted person'
-$tScreen = New-Tab 'Screen time'
+$tReview = New-Tab 'Review and save'
+foreach ($t in $tabs.TabPages) { [void]$lstSteps.Items.Add($t.Text) }
 
-$btnSave    = New-Ctl 'Button' $form @{ Text = 'Save and apply'; Location = (P 588 578); Size = (S 140 34); Font = $FontBold }
-$btnDiscard = New-Ctl 'Button' $form @{ Text = 'Discard changes'; Location = (P 736 578); Size = (S 120 34) }
-$lblBottom  = New-Ctl 'Label' $form @{ Location = (P 12 586); Size = (S 560 24); ForeColor = [System.Drawing.Color]::DimGray
-    Text = 'Changes on the settings tabs take effect when you click Save and apply.' }
+# Draw the step list: current step highlighted, numbered
+$lstSteps.Add_DrawItem({
+    param($s, $e)
+    if ($e.Index -lt 0) { return }
+    $sel = ($e.Index -eq $tabs.SelectedIndex)
+    $bg = if ($sel) { [System.Drawing.Color]::FromArgb(70, 90, 200) } else { [System.Drawing.Color]::FromArgb(28, 32, 52) }
+    $br = New-Object System.Drawing.SolidBrush $bg
+    $e.Graphics.FillRectangle($br, $e.Bounds); $br.Dispose()
+    $txt = '{0}.  {1}' -f ($e.Index + 1), $lstSteps.Items[$e.Index]
+    $fc = if ($sel) { [System.Drawing.Color]::White } else { [System.Drawing.Color]::FromArgb(190, 195, 215) }
+    [System.Windows.Forms.TextRenderer]::DrawText($e.Graphics, $txt, $lstSteps.Font, (New-Object System.Drawing.Point(($e.Bounds.X + 8), ($e.Bounds.Y + 7))), $fc)
+})
+$lstSteps.Add_SelectedIndexChanged({ if ($lstSteps.SelectedIndex -ge 0 -and $tabs.SelectedIndex -ne $lstSteps.SelectedIndex) { $tabs.SelectedIndex = $lstSteps.SelectedIndex } })
+
+$btnBack    = New-Ctl 'Button' $form @{ Text = '< Back'; Location = (P 735 628); Size = (S 100 40); Font = $FontRow }
+$btnNext    = New-Ctl 'Button' $form @{ Text = 'Next >'; Location = (P 843 628); Size = (S 100 40); Font = $FontRowB }
+$btnSave    = New-Ctl 'Button' $form @{ Text = 'Save and apply'; Location = (P 951 628); Size = (S 195 40); Font = $FontRowB }
+$btnDiscard = New-Ctl 'Button' $pnlSteps @{ Text = 'Discard changes'; Location = (P 18 628); Size = (S 170 34); FlatStyle = 'Flat'
+    ForeColor = [System.Drawing.Color]::White; BackColor = [System.Drawing.Color]::FromArgb(45, 50, 75) }
+$DefaultHint = 'Nothing changes until you click Save. You can jump to any step on the left.'
+$lblBottom  = New-Ctl 'Label' $form @{ Location = (P 222 628); Size = (S 505 44); ForeColor = $Gray; Font = $FontRow; Text = $DefaultHint }
+
+function Update-Nav {
+    $i = $tabs.SelectedIndex; $last = $tabs.TabPages.Count - 1
+    $btnBack.Enabled = $i -gt 0
+    $btnNext.Enabled = $i -lt $last
+    $btnNext.Text = $(if ($i -eq $last - 1) { 'Review >' } else { 'Next >' })
+    if ($lstSteps.SelectedIndex -ne $i) { $lstSteps.SelectedIndex = $i }
+    $lstSteps.Invalidate()
+    if ($tabs.SelectedTab -eq $tReview) { Update-Review }
+}
+$btnBack.Add_Click({ if ($tabs.SelectedIndex -gt 0) { $tabs.SelectedIndex-- } })
+$btnNext.Add_Click({ if ($tabs.SelectedIndex -lt $tabs.TabPages.Count - 1) { $tabs.SelectedIndex++ } })
+$tabs.Add_SelectedIndexChanged({ Update-Nav })
+
+# Live check of the settings on screen; shows the first problem under the tabs
+$script:loading = $false
+function Update-Validation {
+    if ($script:loading) { return }
+    try {
+        $errs = Test-NGConfig (Read-Form)
+        if ($errs.Count -gt 0) {
+            $lblBottom.ForeColor = $Red
+            $lblBottom.Text = 'Fix before saving: ' + $errs[0] + $(if ($errs.Count -gt 1) { " (+$($errs.Count - 1) more)" } else { '' })
+        } else {
+            $lblBottom.ForeColor = $Gray
+            $lblBottom.Text = $DefaultHint
+        }
+    } catch { }
+}
 
 # ---------------------------------------------------------------- Status tab
-$txtStatus = New-Ctl 'TextBox' $tStatus @{ Location = (P 10 10); Size = (S 820 420); Multiline = $true; ReadOnly = $true
+$txtStatus = New-Ctl 'TextBox' $tStatus @{ Location = (P 10 10); Size = (S 900 420); Multiline = $true; ReadOnly = $true
     ScrollBars = 'Vertical'; Font = $FontMono; BackColor = [System.Drawing.Color]::White }
 $bRefresh  = New-Ctl 'Button' $tStatus @{ Text = 'Refresh'; Location = (P 10 445); Size = (S 100 32) }
 $bPrevWarn = New-Ctl 'Button' $tStatus @{ Text = 'Preview warning'; Location = (P 120 445); Size = (S 130 32) }
 $bPrevCd   = New-Ctl 'Button' $tStatus @{ Text = 'Preview countdown'; Location = (P 260 445); Size = (S 140 32) }
 $bLog      = New-Ctl 'Button' $tStatus @{ Text = 'Open log'; Location = (P 410 445); Size = (S 100 32) }
-$bUninst   = New-Ctl 'Button' $tStatus @{ Text = 'Uninstall'; Location = (P 730 445); Size = (S 100 32); ForeColor = $Red }
+$bUninst   = New-Ctl 'Button' $tStatus @{ Text = 'Uninstall'; Location = (P 810 445); Size = (S 100 32); ForeColor = $Red }
 
 function Get-StatusText {
     $sb = New-Object System.Text.StringBuilder
     $add = { param($l) [void]$sb.AppendLine($l) }
     $cfg = Get-NGConfig
     if (-not $cfg) {
-        & $add 'NOT INSTALLED'
+        & $add 'WELCOME TO NIGHTGUARD'
         & $add ''
-        & $add 'Look through the settings tabs, then click "Install" at the bottom right.'
+        & $add 'Your bedtime bouncer. Setup takes a minute:'
+        & $add ''
+        & $add '  1. Click Next and pick your bedtimes.'
+        & $add '  2. Go through the steps. The defaults are fine, so just click Next if unsure.'
+        & $add '  3. Check the Review step and click Install.'
+        & $add ''
+        & $add 'Optional extras along the way: game and screen time limits, blocking'
+        & $add 'distracting sites and apps, and a trusted-person code.'
         return $sb.ToString()
     }
     & $add 'BEDTIME LOCK IS ACTIVE'
@@ -251,71 +320,102 @@ function Get-StatusText {
 function Update-Status {
     $txtStatus.Text = Get-StatusText
     $installed = [bool](Get-NGConfig)
-    $btnSave.Text = if ($installed) { 'Save and apply' } else { 'Install' }
+    $btnSave.Text = if ($installed) { 'Save and apply' } else { 'Install NightGuard' }
     $bUninst.Enabled = $installed
     Update-TrustTab
 }
 
 # ---------------------------------------------------------------- Schedule tab
-New-Ctl 'Label' $tSched @{ Location = (P 10 10); Size = (S 820 36); Text = "Each night is named after the evening it starts. A bedtime before 12:00 counts as after midnight, so Mon 00:30 means 12:30 AM early Tuesday. Untick a night to leave it free." } | Out-Null
-$gridSched = New-Grid $tSched (P 10 52) (S 540 205) $false
-Add-Col $gridSched 'TextBox'  'Night'   'Night'   70 $true | Out-Null
-Add-Col $gridSched 'CheckBox' 'On'      'Locked'  60 | Out-Null
-Add-Col $gridSched 'TextBox'  'Bedtime' 'Bedtime' 90 | Out-Null
-Add-Col $gridSched 'TextBox'  'Unlock'  'Unlock'  90 | Out-Null
-Add-Col $gridSched 'TextBox'  'Note'    ''        210 $true | Out-Null
-foreach ($d in $NGDays) { [void]$gridSched.Rows.Add($d, $true, '00:00', '06:00', '') }
+New-Ctl 'Label' $tSched @{ Location = (P 16 12); Size = (S 890 44); Font = $FontRow
+    Text = "Tick the nights NightGuard should guard. Each night is named after the evening it starts, so a bedtime after midnight (like 12:30 AM) on Monday night means early Tuesday morning." } | Out-Null
+New-Ctl 'Label' $tSched @{ Location = (P 16 58); Size = (S 600 20); ForeColor = $Gray; Text = $TimeHint } | Out-Null
+New-Ctl 'Label' $tSched @{ Text = 'Night'; Location = (P 16 88); Size = (S 150 20); Font = $FontBold } | Out-Null
+New-Ctl 'Label' $tSched @{ Text = 'Bedtime'; Location = (P 190 88); Size = (S 110 20); Font = $FontBold } | Out-Null
+New-Ctl 'Label' $tSched @{ Text = 'Unlocks at'; Location = (P 320 88); Size = (S 110 20); Font = $FontBold } | Out-Null
+
+$DayNames = @{ Mon = 'Monday'; Tue = 'Tuesday'; Wed = 'Wednesday'; Thu = 'Thursday'; Fri = 'Friday'; Sat = 'Saturday'; Sun = 'Sunday' }
+$schedChk = @(); $schedBed = @(); $schedUnl = @(); $schedNote = @()
+for ($i = 0; $i -lt 7; $i++) {
+    $y = 112 + $i * 42
+    $schedChk  += New-Ctl 'CheckBox' $tSched @{ Text = "$($DayNames[$NGDays[$i]]) night"; Location = (P 16 ($y + 2)); Size = (S 165 26); Font = $FontRow; Checked = $true }
+    $schedBed  += New-TimePicker $tSched 190 $y '00:00'
+    $schedUnl  += New-TimePicker $tSched 320 $y '06:00'
+    $schedNote += New-Ctl 'Label' $tSched @{ Location = (P 445 ($y + 5)); Size = (S 160 22); ForeColor = $Gray }
+}
 
 function Update-SchedNotes {
     for ($i = 0; $i -lt 7; $i++) {
-        $r = $gridSched.Rows[$i]
-        $bt = [string]$r.Cells['Bedtime'].Value
-        $note = ''
-        if ($bt -match $NGTimeRegex -and [timespan]::Parse($bt).TotalHours -lt 12) { $note = 'after midnight (' + $NGDays[($i + 1) % 7] + ')' }
-        $r.Cells['Note'].Value = $note
+        $on = $schedChk[$i].Checked
+        $schedBed[$i].Enabled = $on; $schedUnl[$i].Enabled = $on
+        if (-not $on) { $schedNote[$i].Text = 'free night'; continue }
+        $bt = [timespan]::Parse((Get-PickerTime $schedBed[$i])); $ut = [timespan]::Parse((Get-PickerTime $schedUnl[$i]))
+        $start = if ($bt.TotalHours -lt 12) { $bt.TotalHours + 24 } else { $bt.TotalHours }
+        $hours = 24 + $ut.TotalHours - $start
+        $txt = if ($hours -le 0) { 'unlock must be after bedtime' } else { 'locked {0:0.#} h' -f $hours }
+        if ($bt.TotalHours -lt 12) { $txt += ', early ' + $DayNames[$NGDays[($i + 1) % 7]].Substring(0, 3) }
+        $schedNote[$i].Text = $txt
+        $schedNote[$i].ForeColor = $(if ($hours -le 0 -or $hours -gt 16) { $Red } else { $Gray })
     }
 }
-$gridSched.Add_CellEndEdit({ Update-SchedNotes })
+for ($i = 0; $i -lt 7; $i++) {
+    $schedChk[$i].Add_CheckedChanged({ Update-SchedNotes; Update-Validation })
+    $schedBed[$i].Add_ValueChanged({ Update-SchedNotes; Update-Validation })
+    $schedUnl[$i].Add_ValueChanged({ Update-SchedNotes; Update-Validation })
+}
 
-$grpQuick = New-Ctl 'GroupBox' $tSched @{ Text = 'Quick set'; Location = (P 565 52); Size = (S 265 205) }
-New-Ctl 'Label' $grpQuick @{ Text = 'Bedtime'; Location = (P 12 28); Size = (S 70 20) } | Out-Null
-$txtQB = New-Ctl 'TextBox' $grpQuick @{ Text = '00:00'; Location = (P 90 25); Size = (S 70 24) }
-New-Ctl 'Label' $grpQuick @{ Text = 'Unlock'; Location = (P 12 58); Size = (S 70 20) } | Out-Null
-$txtQU = New-Ctl 'TextBox' $grpQuick @{ Text = '06:00'; Location = (P 90 55); Size = (S 70 24) }
-$bQAll  = New-Ctl 'Button' $grpQuick @{ Text = 'Apply to all nights'; Location = (P 12 92); Size = (S 240 30) }
-$bQWeek = New-Ctl 'Button' $grpQuick @{ Text = 'Apply to weeknights (Sun-Thu)'; Location = (P 12 128); Size = (S 240 30) }
-$bQEnd  = New-Ctl 'Button' $grpQuick @{ Text = 'Apply to weekend (Fri, Sat)'; Location = (P 12 164); Size = (S 240 30) }
+$grpQuick = New-Ctl 'GroupBox' $tSched @{ Text = 'Set several nights at once'; Location = (P 625 84); Size = (S 285 270); Font = $FontRow }
+New-Ctl 'Label' $grpQuick @{ Text = 'Bedtime'; Location = (P 14 34); Size = (S 100 22) } | Out-Null
+$pickQB = New-TimePicker $grpQuick 130 30 '00:00'
+New-Ctl 'Label' $grpQuick @{ Text = 'Unlocks at'; Location = (P 14 72); Size = (S 100 22) } | Out-Null
+$pickQU = New-TimePicker $grpQuick 130 68 '06:00'
+$bQAll  = New-Ctl 'Button' $grpQuick @{ Text = 'Apply to every night'; Location = (P 14 112); Size = (S 255 40) }
+$bQWeek = New-Ctl 'Button' $grpQuick @{ Text = 'School / work nights (Sun-Thu)'; Location = (P 14 158); Size = (S 255 40) }
+$bQEnd  = New-Ctl 'Button' $grpQuick @{ Text = 'Weekend nights (Fri, Sat)'; Location = (P 14 204); Size = (S 255 40) }
 
 function Set-QuickNights([string[]]$Days) {
-    $bt = Normalize-Time $txtQB.Text; $ut = Normalize-Time $txtQU.Text
-    if ($bt -notmatch $NGTimeRegex -or $ut -notmatch $NGTimeRegex) { Msg 'Type times like 23:30.' 'Warning'; return }
-    $gridSched.EndEdit() | Out-Null
-    foreach ($r in $gridSched.Rows) {
-        if ($Days -contains [string]$r.Cells['Night'].Value) { $r.Cells['On'].Value = $true; $r.Cells['Bedtime'].Value = $bt; $r.Cells['Unlock'].Value = $ut }
+    for ($i = 0; $i -lt 7; $i++) {
+        if ($Days -contains $NGDays[$i]) {
+            $schedChk[$i].Checked = $true
+            $schedBed[$i].Value = $pickQB.Value
+            $schedUnl[$i].Value = $pickQU.Value
+        }
     }
-    Update-SchedNotes
+    Update-SchedNotes; Update-Validation
 }
 $bQAll.Add_Click({ Set-QuickNights $NGDays })
 $bQWeek.Add_Click({ Set-QuickNights @('Sun', 'Mon', 'Tue', 'Wed', 'Thu') })
 $bQEnd.Add_Click({ Set-QuickNights @('Fri', 'Sat') })
 
-New-Ctl 'Label' $tSched @{ Location = (P 10 270); Size = (S 820 60); ForeColor = [System.Drawing.Color]::DimGray
+New-Ctl 'Label' $tSched @{ Location = (P 16 412); Size = (S 890 44); ForeColor = $Gray
     Text = "Safety limits: a night can be at most 16 hours, and there must be at least 6 free hours between nights, so the PC is always usable during the day." } | Out-Null
 
 # ---------------------------------------------------------------- Warnings tab
-New-Ctl 'Label' $tWarn @{ Location = (P 10 10); Size = (S 820 36); Text = "Up to 6 popups before bedtime. In the message you can use {minutes} {bedtime} {unlock} {action}, and \n for a new line. Add a row at the bottom; select a row and press Delete to remove it." } | Out-Null
-$gridWarn = New-Grid $tWarn (P 10 52) (S 820 300) $true
-Add-Col $gridWarn 'TextBox'  'Minutes' 'Minutes before' 110 | Out-Null
-Add-Col $gridWarn 'CheckBox' 'Sound'   'Sound'          60 | Out-Null
-$colMsg = Add-Col $gridWarn 'TextBox' 'Message' 'Message' 600
-$colMsg.AutoSizeMode = 'Fill'
-$gridWarn.Add_DefaultValuesNeeded({
-    param($s, $e)
-    $e.Row.Cells['Minutes'].Value = '15'
-    $e.Row.Cells['Sound'].Value = $true
-    $e.Row.Cells['Message'].Value = 'Bedtime in {minutes} minutes. The PC will {action} at {bedtime}.'
-})
-$bWPrev = New-Ctl 'Button' $tWarn @{ Text = 'Preview selected warning'; Location = (P 10 362); Size = (S 190 32) }
+New-Ctl 'Label' $tWarn @{ Location = (P 16 12); Size = (S 890 44); Font = $FontRow
+    Text = "Up to 6 popups before bedtime. Tick the ones you want. In the message you can use {minutes} {bedtime} {unlock} {action}, and \n for a new line." } | Out-Null
+New-Ctl 'Label' $tWarn @{ Text = 'On'; Location = (P 16 66); Size = (S 40 20); Font = $FontBold } | Out-Null
+New-Ctl 'Label' $tWarn @{ Text = 'Minutes before bedtime'; Location = (P 60 66); Size = (S 170 20); Font = $FontBold } | Out-Null
+New-Ctl 'Label' $tWarn @{ Text = 'Sound'; Location = (P 236 66); Size = (S 60 20); Font = $FontBold } | Out-Null
+New-Ctl 'Label' $tWarn @{ Text = 'Message'; Location = (P 300 66); Size = (S 200 20); Font = $FontBold } | Out-Null
+$warnOn = @(); $warnMin = @(); $warnSnd = @(); $warnMsg = @(); $warnPrev = @()
+for ($i = 0; $i -lt 6; $i++) {
+    $y = 92 + $i * 50
+    $warnOn  += New-Ctl 'CheckBox' $tWarn @{ Location = (P 20 ($y + 4)); Size = (S 30 24) }
+    $warnMin += New-Ctl 'NumericUpDown' $tWarn @{ Location = (P 60 $y); Size = (S 80 28); Minimum = 1; Maximum = 360; Value = 15; Font = $FontRow }
+    New-Ctl 'Label' $tWarn @{ Text = 'min'; Location = (P 145 ($y + 4)); Size = (S 40 22); Font = $FontRow } | Out-Null
+    $warnSnd += New-Ctl 'CheckBox' $tWarn @{ Location = (P 246 ($y + 4)); Size = (S 30 24); Checked = $true }
+    $warnMsg += New-Ctl 'TextBox' $tWarn @{ Location = (P 300 $y); Size = (S 500 28); Font = $FontRow; Text = 'Bedtime in {minutes} minutes. The PC will {action} at {bedtime}.' }
+    $warnPrev += New-Ctl 'Button' $tWarn @{ Text = 'Preview'; Location = (P 810 ($y - 1)); Size = (S 95 32); Tag = $i }
+}
+function Update-WarnRows {
+    for ($i = 0; $i -lt 6; $i++) {
+        $on = $warnOn[$i].Checked
+        $warnMin[$i].Enabled = $on; $warnSnd[$i].Enabled = $on; $warnMsg[$i].Enabled = $on; $warnPrev[$i].Enabled = $on
+    }
+}
+for ($i = 0; $i -lt 6; $i++) {
+    $warnOn[$i].Add_CheckedChanged({ Update-WarnRows; Update-Validation })
+    $warnMin[$i].Add_ValueChanged({ Update-Validation })
+}
 
 # ---------------------------------------------------------------- Bedtime action tab
 New-Ctl 'Label' $tAct @{ Text = 'At bedtime the PC will:'; Location = (P 10 16); Size = (S 200 20); Font = $FontBold } | Out-Null
@@ -356,22 +456,31 @@ $txtSites = New-Ctl 'TextBox' $tBlock @{ Location = (P 10 66); Size = (S 250 330
 $bPreset = New-Ctl 'Button' $tBlock @{ Text = 'Add social media list'; Location = (P 10 402); Size = (S 250 30) }
 
 New-Ctl 'Label' $tBlock @{ Text = 'Apps (their internet is blocked):'; Location = (P 280 44); Size = (S 300 20) } | Out-Null
-$lstApps = New-Ctl 'ListBox' $tBlock @{ Location = (P 280 66); Size = (S 420 120); HorizontalScrollbar = $true }
-$bAddExe = New-Ctl 'Button' $tBlock @{ Text = 'Add program...'; Location = (P 710 66); Size = (S 120 28) }
-$bAddDir = New-Ctl 'Button' $tBlock @{ Text = 'Add folder...'; Location = (P 710 100); Size = (S 120 28) }
-$bDelApp = New-Ctl 'Button' $tBlock @{ Text = 'Remove'; Location = (P 710 134); Size = (S 120 28) }
+$lstApps = New-Ctl 'ListBox' $tBlock @{ Location = (P 280 66); Size = (S 490 120); HorizontalScrollbar = $true }
+$bAddExe = New-Ctl 'Button' $tBlock @{ Text = 'Add program...'; Location = (P 780 66); Size = (S 130 32) }
+$bAddDir = New-Ctl 'Button' $tBlock @{ Text = 'Add folder...'; Location = (P 780 104); Size = (S 130 32) }
+$bDelApp = New-Ctl 'Button' $tBlock @{ Text = 'Remove'; Location = (P 780 142); Size = (S 130 32) }
 
-New-Ctl 'Label' $tBlock @{ Text = 'Block at these times (add a row at the bottom; a slot like 22:00-02:00 crosses midnight):'; Location = (P 280 196); Size = (S 550 20) } | Out-Null
-$gridWin = New-Grid $tBlock (P 280 218) (S 550 178) $true
-foreach ($d in $NGDays) { Add-Col $gridWin 'CheckBox' $d $d 44 | Out-Null }
-Add-Col $gridWin 'TextBox' 'From' 'From' 70 | Out-Null
-Add-Col $gridWin 'TextBox' 'To' 'To' 70 | Out-Null
-$gridWin.Add_DefaultValuesNeeded({
-    param($s, $e)
-    foreach ($d in $NGDays) { $e.Row.Cells[$d].Value = ($d -notin @('Sat', 'Sun')) }
-    $e.Row.Cells['From'].Value = '09:00'; $e.Row.Cells['To'].Value = '17:00'
-})
-New-Ctl 'Label' $tBlock @{ Location = (P 280 402); Size = (S 550 90); ForeColor = [System.Drawing.Color]::DimGray
+New-Ctl 'Label' $tBlock @{ Text = 'Block at these times (a slot like 10 PM to 2 AM crosses midnight):'; Location = (P 280 196); Size = (S 630 20) } | Out-Null
+$slotOn = @(); $slotDays = @(); $slotFrom = @(); $slotTo = @()
+$x0 = 280
+New-Ctl 'Label' $tBlock @{ Text = 'On'; Location = (P $x0 220); Size = (S 30 18); Font = $FontBold } | Out-Null
+for ($d = 0; $d -lt 7; $d++) { New-Ctl 'Label' $tBlock @{ Text = $NGDays[$d]; Location = (P ($x0 + 40 + $d * 42) 220); Size = (S 40 18); Font = $FontBold } | Out-Null }
+New-Ctl 'Label' $tBlock @{ Text = 'From'; Location = (P ($x0 + 340) 220); Size = (S 60 18); Font = $FontBold } | Out-Null
+New-Ctl 'Label' $tBlock @{ Text = 'To'; Location = (P ($x0 + 482) 220); Size = (S 60 18); Font = $FontBold } | Out-Null
+for ($i = 0; $i -lt 4; $i++) {
+    $y = 242 + $i * 38
+    $slotOn += New-Ctl 'CheckBox' $tBlock @{ Location = (P $x0 ($y + 3)); Size = (S 28 24) }
+    $days = @()
+    for ($d = 0; $d -lt 7; $d++) { $days += New-Ctl 'CheckBox' $tBlock @{ Location = (P ($x0 + 44 + $d * 42) ($y + 3)); Size = (S 28 24); Checked = ($d -lt 5) } }
+    $slotDays += , $days
+    $slotFrom += New-TimePicker $tBlock ($x0 + 340) $y '09:00'
+    New-Ctl 'Label' $tBlock @{ Text = 'to'; Location = (P ($x0 + 457) ($y + 5)); Size = (S 22 20) } | Out-Null
+    $slotTo += New-TimePicker $tBlock ($x0 + 482) $y '17:00'
+}
+foreach ($c in $slotOn) { $c.Add_CheckedChanged({ Update-Validation }) }
+
+New-Ctl 'Label' $tBlock @{ Location = (P 280 400); Size = (S 630 90); ForeColor = [System.Drawing.Color]::DimGray
     Text = "Sites are blocked in a marked section of the Windows hosts file; apps with Windows Firewall rules named 'NightGuard'. Both are removed automatically when the time slot ends, on uninstall, and if anything goes wrong. Browsers with 'secure DNS' turned on can get around site blocking (see the README). Blocking an app cuts its internet; it does not close it." } | Out-Null
 
 $bPreset.Add_Click({
@@ -527,70 +636,92 @@ $bAddGF.Add_Click({
 })
 $bUsage.Add_Click({ Safe { $c = Get-NGConfig; $lblUsage.Text = $(if ($c) { Get-NGUsageText $c } else { '' }) } })
 
-# ============================================================================
-# First run: a few clicks to get going; everything else is on the tabs
-# ============================================================================
-function Show-FirstRun($Cfg) {
-    $d = New-Ctl 'Form' $null @{ Text = 'Welcome to NightGuard'; Size = (S 480 400); StartPosition = 'CenterScreen'
-        FormBorderStyle = 'FixedDialog'; MaximizeBox = $false; MinimizeBox = $false; Font = $FontUI }
-    New-Ctl 'Label' $d @{ Location = (P 20 16); Size = (S 430 60); Font = (New-Object System.Drawing.Font('Segoe UI', 11))
-        Text = "Let's get you to bed on time.`nPick your bedtime and you're done. Everything else can be changed later." } | Out-Null
-    $first = $Cfg.Schedule.Mon
-    New-Ctl 'Label' $d @{ Text = 'Bedtime (every night):'; Location = (P 20 96); Size = (S 200 20) } | Out-Null
-    $tB = New-Ctl 'TextBox' $d @{ Text = $first.Bedtime; Location = (P 230 93); Size = (S 80 24); Font = $FontMono }
-    New-Ctl 'Label' $d @{ Text = 'PC unlocks again at:'; Location = (P 20 130); Size = (S 200 20) } | Out-Null
-    $tU = New-Ctl 'TextBox' $d @{ Text = $first.Unlock; Location = (P 230 127); Size = (S 80 24); Font = $FontMono }
-    New-Ctl 'Label' $d @{ Text = 'At bedtime the PC will:'; Location = (P 20 164); Size = (S 200 20) } | Out-Null
-    $cA = New-Ctl 'ComboBox' $d @{ Location = (P 230 161); Size = (S 140 24); DropDownStyle = 'DropDownList' }
-    foreach ($a in $NGActions) { [void]$cA.Items.Add($a) }
-    $cA.SelectedItem = [string]$Cfg.Action
-    $cS = New-Ctl 'CheckBox' $d @{ Text = 'Also block social media sites at bedtime'; Location = (P 20 200); Size = (S 400 24); Checked = $true }
-    New-Ctl 'Label' $d @{ Location = (P 20 232); Size = (S 430 40); ForeColor = [System.Drawing.Color]::DimGray
-        Text = 'You get warnings 30 and 5 minutes before bedtime. Settings are locked for the last hour before bedtime.' } | Out-Null
-    $ok = New-Ctl 'Button' $d @{ Text = 'Install'; Location = (P 20 300); Size = (S 140 34); Font = $FontBold; DialogResult = 'OK' }
-    $more = New-Ctl 'Button' $d @{ Text = 'Customize first...'; Location = (P 170 300); Size = (S 150 34); DialogResult = 'Retry' }
-    New-Ctl 'Button' $d @{ Text = 'Cancel'; Location = (P 330 300); Size = (S 110 34); DialogResult = 'Cancel' } | Out-Null
-    $d.AcceptButton = $ok
-    while ($true) {
-        $r = $d.ShowDialog()
-        if ($r -ne 'OK') { $d.Dispose(); return [string]$r }
-        $bt = Normalize-Time $tB.Text; $ut = Normalize-Time $tU.Text
-        foreach ($day in $NGDays) { $Cfg.Schedule.$day.Enabled = $true; $Cfg.Schedule.$day.Bedtime = $bt; $Cfg.Schedule.$day.Unlock = $ut }
-        $Cfg.Action = [string]$cA.SelectedItem
-        $Cfg.Blocking.Enabled = $cS.Checked
-        $Cfg.Blocking.DuringBedtime = $true
-        $errs = Test-NGConfig $Cfg
-        if ($errs.Count -gt 0) {
-            [void][System.Windows.Forms.MessageBox]::Show($d, ("Please fix these:`n`n- " + ($errs -join "`n- ")), 'NightGuard', 'OK', 'Warning')
-            continue
-        }
-        try {
-            $tmp = Join-Path $env:TEMP 'nightguard-settings.json'
-            Set-Content -Path $tmp -Value (ConvertTo-NGJson $Cfg) -Encoding UTF8
-            $d.Cursor = 'WaitCursor'
-            & (Join-Path $PSScriptRoot 'install.ps1') -ConfigPath $tmp -NoPause -ThrowOnError | Out-Null
-            Remove-Item $tmp -Force -ErrorAction SilentlyContinue
-            [void][System.Windows.Forms.MessageBox]::Show($d, "NightGuard is on guard. Sweet dreams!`n`nOpen it any time from Start Menu > NightGuard.", 'NightGuard', 'OK', 'Information')
-            $d.Dispose()
-            return 'Installed'
-        } catch {
-            $d.Cursor = 'Default'
-            [void][System.Windows.Forms.MessageBox]::Show($d, $_.Exception.Message, 'NightGuard', 'OK', 'Error')
-        }
+# ---------------------------------------------------------------- Review page
+New-Ctl 'Label' $tReview @{ Text = 'Review and save'; Location = (P 16 12); Size = (S 600 30); Font = $FontBig } | Out-Null
+New-Ctl 'Label' $tReview @{ Location = (P 16 46); Size = (S 890 24); Font = $FontRow
+    Text = 'Here is everything NightGuard will do. Go back to any step to change it, then click Save.' } | Out-Null
+$txtReview = New-Ctl 'TextBox' $tReview @{ Location = (P 16 78); Size = (S 895 500); Multiline = $true; ReadOnly = $true; ScrollBars = 'Vertical'
+    Font = (New-Object System.Drawing.Font('Consolas', 10.5)); BackColor = [System.Drawing.Color]::White }
+
+function Update-Review {
+    $sb = New-Object System.Text.StringBuilder
+    $add = { param($l) [void]$sb.AppendLine($l) }
+    try { $cfg = Read-Form } catch { $txtReview.Text = $_.Exception.Message; return }
+    $errs = Test-NGConfig $cfg
+    if ($errs.Count -gt 0) {
+        & $add 'PLEASE FIX THESE FIRST:'
+        foreach ($e in $errs) { & $add "  - $e" }
+        & $add ''
     }
+    & $add 'BEDTIMES'
+    for ($i = 0; $i -lt 7; $i++) {
+        $s = $cfg.Schedule.($NGDays[$i])
+        $name = ('{0} night' -f $DayNames[$NGDays[$i]]).PadRight(17)
+        if ($s.Enabled) { & $add ("  {0} {1} until {2}" -f $name, (Format-LocalTime $s.Bedtime), (Format-LocalTime $s.Unlock)) }
+        else { & $add "  $name free" }
+    }
+    & $add ''
+    & $add 'WARNINGS'
+    $ws = @($cfg.Warnings | Where-Object { $_ })
+    if ($ws.Count -eq 0) { & $add '  none' }
+    foreach ($w in $ws) { & $add ("  {0} min before bedtime{1}" -f $w.MinutesBefore, $(if ($w.Sound) { ', with sound' } else { '' })) }
+    & $add ''
+    & $add 'AT BEDTIME'
+    & $add ("  {0} after a {1} second countdown, repeating every {2} min through the night" -f $cfg.Action, $cfg.CountdownSeconds, $cfg.RecheckMinutes)
+    & $add ("  Settings locked from {0} min before bedtime until unlock" -f $cfg.NightModeMinutes)
+    & $add ("  End date: {0}" -f $(if ($cfg.EndDate) { "last night is $($cfg.EndDate), then NightGuard removes itself" } else { 'none' }))
+    & $add ''
+    & $add 'GAME AND SCREEN TIME'
+    $st = $cfg.ScreenTime
+    if ($st.Enabled) {
+        $f = { param($m) if ([int]$m -le 0) { 'no limit' } else { Format-NGMinutes $m } }
+        & $add ("  Games : {0} weekdays, {1} weekends" -f (& $f $st.GameMinutesWeekday), (& $f $st.GameMinutesWeekend))
+        & $add ("  Screen: {0} weekdays, {1} weekends, then {2}" -f (& $f $st.ScreenMinutesWeekday), (& $f $st.ScreenMinutesWeekend), $st.LimitAction)
+        & $add ("  New day starts at {0}:00" -f $st.ResetHour)
+    } else { & $add '  off' }
+    & $add ''
+    & $add 'BLOCKING'
+    $b = $cfg.Blocking
+    if ($b.Enabled) {
+        & $add ("  {0} sites, {1} apps/folders" -f @($b.Sites).Count, @($b.Apps).Count)
+        if ($b.DuringBedtime) { & $add '  during bedtime hours' }
+        foreach ($w in @($b.Windows)) { & $add ("  {0}: {1} to {2}" -f (@($w.Days) -join ' '), (Format-LocalTime $w.From), (Format-LocalTime $w.To)) }
+    } else { & $add '  off' }
+    & $add ''
+    & $add 'TRUSTED PERSON'
+    & $add $(if (Get-NGTrusted) { '  ON, saving needs the code' } else { '  off (set it up on the Trusted person step, after installing)' })
+    $txtReview.Text = $sb.ToString()
 }
 
 # ============================================================================
 # Moving settings between the form and the config
 # ============================================================================
 function Load-Form($Cfg) {
+    $script:loading = $true
     for ($i = 0; $i -lt 7; $i++) {
-        $s = $Cfg.Schedule.($NGDays[$i]); $r = $gridSched.Rows[$i]
-        $r.Cells['On'].Value = [bool]$s.Enabled; $r.Cells['Bedtime'].Value = $s.Bedtime; $r.Cells['Unlock'].Value = $s.Unlock
+        $s = $Cfg.Schedule.($NGDays[$i])
+        $schedChk[$i].Checked = [bool]$s.Enabled
+        Set-PickerTime $schedBed[$i] ([string]$s.Bedtime)
+        Set-PickerTime $schedUnl[$i] ([string]$s.Unlock)
     }
     Update-SchedNotes
-    $gridWarn.Rows.Clear()
-    foreach ($w in @($Cfg.Warnings | Where-Object { $_ })) { [void]$gridWarn.Rows.Add([string]$w.MinutesBefore, [bool]$w.Sound, [string]$w.Message) }
+    $ws = @($Cfg.Warnings | Where-Object { $_ })
+    $defaultMins = @(30, 5, 60, 15, 10, 2)
+    for ($i = 0; $i -lt 6; $i++) {
+        if ($i -lt $ws.Count) {
+            $warnOn[$i].Checked = $true
+            $warnMin[$i].Value = [math]::Min(360, [math]::Max(1, [int]$ws[$i].MinutesBefore))
+            $warnSnd[$i].Checked = [bool]$ws[$i].Sound
+            $warnMsg[$i].Text = [string]$ws[$i].Message
+        } else {
+            $warnOn[$i].Checked = $false
+            $used = @($ws | ForEach-Object { [int]$_.MinutesBefore })
+            $warnMin[$i].Value = @($defaultMins + (1..360) | Where-Object { $used -notcontains $_ })[$i - $ws.Count]
+            $warnSnd[$i].Checked = $true
+            $warnMsg[$i].Text = 'Bedtime in {minutes} minutes. The PC will {action} at {bedtime}.'
+        }
+    }
+    Update-WarnRows
     $cboAction.SelectedItem = [string]$Cfg.Action
     $numCountdown.Value = [math]::Min(600, [math]::Max(15, [int]$Cfg.CountdownSeconds))
     $numRecheck.Value   = [math]::Min(60, [math]::Max(1, [int]$Cfg.RecheckMinutes))
@@ -623,37 +754,36 @@ function Load-Form($Cfg) {
     $txtIgnore.Lines   = @($st.IgnoreProcesses | Where-Object { $_ })
     $txtLaunch.Lines   = @($st.LauncherProcesses | Where-Object { $_ })
     $lblUsage.Text = $(if (Get-NGConfig) { Get-NGUsageText $Cfg } else { '' })
-    $gridWin.Rows.Clear()
-    foreach ($w in @($b.Windows | Where-Object { $_ })) {
-        $vals = @()
-        foreach ($d in $NGDays) { $vals += (@($w.Days) -contains $d) }
-        $vals += [string]$w.From; $vals += [string]$w.To
-        [void]$gridWin.Rows.Add($vals)
+    $wins = @($b.Windows | Where-Object { $_ })
+    for ($i = 0; $i -lt 4; $i++) {
+        if ($i -lt $wins.Count) {
+            $slotOn[$i].Checked = $true
+            for ($d = 0; $d -lt 7; $d++) { $slotDays[$i][$d].Checked = (@($wins[$i].Days) -contains $NGDays[$d]) }
+            Set-PickerTime $slotFrom[$i] ([string]$wins[$i].From)
+            Set-PickerTime $slotTo[$i] ([string]$wins[$i].To)
+        } else {
+            $slotOn[$i].Checked = $false
+        }
     }
+    $script:loading = $false
+    Update-Validation
 }
 
 function Read-Form {
-    foreach ($g in @($gridSched, $gridWarn, $gridWin)) { [void]$g.EndEdit() }
     $sched = [ordered]@{}
-    foreach ($r in $gridSched.Rows) {
-        $sched[[string]$r.Cells['Night'].Value] = [pscustomobject]@{
-            Enabled = [bool]$r.Cells['On'].Value
-            Bedtime = Normalize-Time ([string]$r.Cells['Bedtime'].Value)
-            Unlock  = Normalize-Time ([string]$r.Cells['Unlock'].Value)
-        }
+    for ($i = 0; $i -lt 7; $i++) {
+        $sched[$NGDays[$i]] = [pscustomobject]@{ Enabled = $schedChk[$i].Checked; Bedtime = Get-PickerTime $schedBed[$i]; Unlock = Get-PickerTime $schedUnl[$i] }
     }
     $warn = @()
-    foreach ($r in $gridWarn.Rows) {
-        if ($r.IsNewRow) { continue }
-        $m = 0
-        if (-not [int]::TryParse(([string]$r.Cells['Minutes'].Value).Trim(), [ref]$m)) { $m = -1 }
-        $warn += [pscustomobject]@{ MinutesBefore = $m; Sound = [bool]$r.Cells['Sound'].Value; Message = [string]$r.Cells['Message'].Value }
+    for ($i = 0; $i -lt 6; $i++) {
+        if (-not $warnOn[$i].Checked) { continue }
+        $warn += [pscustomobject]@{ MinutesBefore = [int]$warnMin[$i].Value; Sound = $warnSnd[$i].Checked; Message = $warnMsg[$i].Text }
     }
     $wins = @()
-    foreach ($r in $gridWin.Rows) {
-        if ($r.IsNewRow) { continue }
-        $days = @($NGDays | Where-Object { [bool]$r.Cells[$_].Value })
-        $wins += [pscustomobject]@{ Days = $days; From = Normalize-Time ([string]$r.Cells['From'].Value); To = Normalize-Time ([string]$r.Cells['To'].Value) }
+    for ($i = 0; $i -lt 4; $i++) {
+        if (-not $slotOn[$i].Checked) { continue }
+        $days = @(); for ($d = 0; $d -lt 7; $d++) { if ($slotDays[$i][$d].Checked) { $days += $NGDays[$d] } }
+        $wins += [pscustomobject]@{ Days = $days; From = Get-PickerTime $slotFrom[$i]; To = Get-PickerTime $slotTo[$i] }
     }
     $cfg = [pscustomobject]@{
         Version = 3
@@ -732,27 +862,25 @@ $btnSave.Add_Click({ Safe {
 $btnDiscard.Add_Click({ Safe { Reload-Form } })
 $bRefresh.Add_Click({ Safe { Update-Status } })
 
-function Invoke-Preview([string]$Script, [string[]]$ScriptArgs) {
+function Invoke-Preview([string]$Script, [string[]]$ScriptArgs, $Cfg = $null) {
+    if (-not $Cfg) { $Cfg = Read-Form }
     # Preview with the settings currently on screen
     $tmp = Join-Path $env:TEMP 'nightguard-preview'
     New-Item -ItemType Directory -Force -Path $tmp | Out-Null
     Copy-Item (Join-Path $PSScriptRoot 'common.ps1'), (Join-Path $PSScriptRoot $Script) -Destination $tmp -Force
-    Set-Content -Path (Join-Path $tmp 'config.json') -Value (ConvertTo-NGJson (Read-Form)) -Encoding UTF8
+    Set-Content -Path (Join-Path $tmp 'config.json') -Value (ConvertTo-NGJson $Cfg) -Encoding UTF8
     Start-Process powershell.exe -ArgumentList (@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', "`"$(Join-Path $tmp $Script)`"") + $ScriptArgs)
 }
 $bPrevWarn.Add_Click({ Safe { Invoke-Preview 'warn.ps1' @('-Preview', '-Index', '1') } })
 $bPrevCd.Add_Click({ Safe { Invoke-Preview 'session.ps1' @('-Preview') } })
-$bWPrev.Add_Click({ Safe {
-    $i = 1
-    if ($gridWarn.CurrentRow -and -not $gridWarn.CurrentRow.IsNewRow) {
-        # Warnings are sorted by minutes on save; find the selected one's position after sorting
-        $sel = 0; [void][int]::TryParse([string]$gridWarn.CurrentRow.Cells['Minutes'].Value, [ref]$sel)
-        $sorted = @((Read-Form).Warnings | ForEach-Object { [int]$_.MinutesBefore })
-        $pos = [array]::IndexOf($sorted, $sel)
-        if ($pos -ge 0) { $i = $pos + 1 }
-    }
-    Invoke-Preview 'warn.ps1' @('-Preview', '-Index', "$i")
-} })
+foreach ($wb in $warnPrev) {
+    $wb.Add_Click({ param($sender, $e) Safe {
+        $i = [int]$sender.Tag
+        $cfg = Read-Form
+        $cfg.Warnings = @([pscustomobject]@{ MinutesBefore = [int]$warnMin[$i].Value; Sound = $warnSnd[$i].Checked; Message = $warnMsg[$i].Text })
+        Invoke-Preview 'warn.ps1' @('-Preview', '-Index', '1') $cfg
+    } })
+}
 $bLog.Add_Click({ Safe {
     $log = Join-Path $NGDir 'log.txt'
     if (Test-Path $log) { Start-Process notepad.exe -ArgumentList "`"$log`"" } else { Msg 'Nothing logged yet.' }
@@ -776,12 +904,8 @@ $timer.Add_Tick({ if ($tabs.SelectedTab -eq $tStatus) { try { $txtStatus.Text = 
 $timer.Start()
 
 try {
-    if (-not (Get-NGConfig)) {
-        $r = Show-FirstRun (Get-StartingConfig)
-        if ($r -eq 'Cancel') { return }
-    }
     Reload-Form
-    if (-not (Get-NGConfig)) { $tabs.SelectedTab = $tSched }
+    Update-Nav
     [void]$form.ShowDialog()
 } catch {
     [void][System.Windows.Forms.MessageBox]::Show("NightGuard could not start: $($_.Exception.Message)`n`nYou can use TextMenu.cmd instead.", 'NightGuard', 'OK', 'Error')

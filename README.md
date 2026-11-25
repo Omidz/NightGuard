@@ -27,7 +27,7 @@ NightGuard warns you before bedtime, then **shuts your PC down** (or puts it to 
 1. Click the green **Code** button above, then **Download ZIP**.
 2. Unzip it anywhere, for example your Downloads folder.
 3. Double-click **`NightGuard.cmd`** and click **Yes** on the admin prompt.
-4. Pick your bedtime, click **Install**. Done. Go to bed. (Well, at bedtime.)
+4. Click through the setup wizard. The defaults are sensible, so **Next, Next, Next** is fine. Check the **Review** step and click **Install NightGuard**. Done. Go to bed. (Well, at bedtime.)
 
 After that, open NightGuard from **Start Menu > NightGuard**.
 
@@ -59,16 +59,18 @@ Once it's installed, the Start Menu shortcut won't be blocked again.
 
 ## 🎛️ Settings
 
-All of this is in the NightGuard window. Nothing changes until you click **Save and apply**.
+NightGuard opens as a step-by-step wizard. Use **Next** and **Back**, or jump to any step in the list on the left. Nothing changes until you click **Save**. To change something later, open NightGuard again and go straight to that step.
 
-| Tab | What you can set | Default |
+Times are shown the same way as your Windows clock: 12-hour with AM/PM, or 24-hour. Click the hour or minute and use the arrows, or just type.
+
+| Step | What you can set | Default |
 |---|---|---|
-| **Schedule** | Bedtime and unlock time for each night. Untick nights to leave them free. | Every night, 00:00 to 06:00 |
+| **Bedtimes** | Bedtime and unlock time for each night. Untick nights to leave them free. | Every night, 00:00 to 06:00 |
 | **Warnings** | Up to 6 popups: how many minutes before, the message, sound on or off | 30 and 5 minutes before |
-| **Bedtime action** | Shutdown, Sleep, Hibernate, Lock or Sign out. Countdown length, how often it repeats, night mode length, end date. | Shutdown, 60 s countdown, repeats every 5 min |
+| **At bedtime** | Shutdown, Sleep, Hibernate, Lock or Sign out. Countdown length, how often it repeats, night mode length, end date. | Shutdown, 60 s countdown, repeats every 5 min |
 | **Block sites and apps** | Websites, apps or whole folders to block, and when | Off (a social media list is ready to go) |
 | **Trusted person** | Turn on the code lock | Off |
-| **Screen time** | Daily game and screen time budgets (weekdays and weekends), warnings, what happens when time runs out, which programs count as games | Off (1 h games / 4 h screen on weekdays, 2 h / 6 h at weekends when you turn it on) |
+| **Game and screen time** | Daily game and screen time budgets (weekdays and weekends), warnings, what happens when time runs out, which programs count as games | Off (1 h games / 4 h screen on weekdays, 2 h / 6 h at weekends when you turn it on) |
 
 **How nights are named:** after the evening they start. A bedtime before 12:00 counts as *after midnight*, so "Mon 00:30" means 12:30 AM, early Tuesday.
 
@@ -88,7 +90,7 @@ All of this is in the NightGuard window. Nothing changes until you click **Save 
 
 ## 🎮 Screen time limits
 
-Turn them on in the **Screen time** tab.
+Turn them on in the **Game and screen time** step.
 
 - **Game time** counts while a game is running and you're at the screen. It warns you at 15, 5 and 1 minutes left. When it's used up, games (and optionally launchers like Steam) are closed, and closed again if you reopen them.
 - **Screen time** counts every minute you're signed in and the screen isn't locked. When it runs out, NightGuard **locks** the PC (default), **shuts it down**, or just **nags** you, your choice.
@@ -165,8 +167,8 @@ If it's during locked hours, boot into **Safe Mode** first (hold **Shift** while
 
 NightGuard is young. It's built carefully, but it hasn't been battle-tested on lots of PCs yet. Do a quick daytime test:
 
-1. Open NightGuard and click **Preview warning** and **Preview countdown** on the Status tab.
-2. On the Schedule tab, set *tonight's* night to a time a few minutes from now (for example bedtime `15:10`, unlock `15:40`), set **Night mode** to `0` on the Bedtime action tab, and save.
+1. Open NightGuard and click **Preview warning** and **Preview countdown** on the Welcome step.
+2. On the Bedtimes step, set *tonight's* night to a time a few minutes from now (for example bedtime 3:10 PM, unlocks 3:40 PM), set **Night mode** to `0` on the At bedtime step, and save.
 3. Watch the warnings, then the shutdown. Turn the PC on again and check it shuts down again.
 4. After the unlock time, set your real schedule.
 
