@@ -36,6 +36,7 @@ try {
 
     # Trusted-person mode: every change needs the code
     Assert-NGCode $Code   # does nothing when trusted-person mode is off
+    $codeOk = [bool](Get-NGTrusted)   # a correct code also skips the cool-off
 
     # Upgrading from the old name (Bedtime Lock)? Remove it; its settings carry over.
     if (Test-Path $NGLegacyDir) {
@@ -55,6 +56,22 @@ try {
     $errs = Test-NGConfig $cfg
     if ($errs.Count -gt 0) { throw ("Settings have problems:`n  - " + ($errs -join "`n  - ")) }
     if (Test-NGExpired $cfg) { throw "The end date $($cfg.EndDate) has already passed." }
+
+    # Self-lock: stricter is always fine; looser needs an open unlock (7-day cool-off) or the code
+    $usedUnlock = $false
+    if ($current -and -not $codeOk) {
+        $looser = @(Get-NGLoosening $current $cfg)
+        if ($looser.Count -gt 0) {
+            if ((Get-NGEndDate $current) -and (@($looser) -contains 'earlier end date')) {
+                throw "The end date can't be moved earlier. NightGuard is locked in until $($current.EndDate)."
+            }
+            if ((Get-NGUnlock).State -ne 'Open') {
+                throw ("These changes make NightGuard looser:`n  - " + ($looser -join "`n  - ") +
+                       "`n`n$(Format-NGUnlockText)`nStricter changes can be saved right away.")
+            }
+            $usedUnlock = $true
+        }
+    }
 
     $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 
@@ -199,6 +216,7 @@ try {
     } catch { }
 
     Write-Host ''
+    if ($usedUnlock) { Clear-NGUnlock 'used for looser settings' }
     Write-Host 'Saved. NightGuard is installed and your settings are active.' -ForegroundColor Green
     Write-Host '  Open it from: Start Menu > NightGuard'
     Write-NGLog 'settings saved'

@@ -1,6 +1,7 @@
 <#
   NightGuard - uninstaller. Usually run from the app or the text menu.
-  Refuses during night mode. In trusted-person mode it needs the code:
+  Refuses during night mode. Otherwise it needs either the trusted person's code,
+  or (no end date set) an unlock request whose 7-day cool-off has passed:
     .\uninstall.ps1 -Code 12345678
   Removes only what NightGuard created: its scheduled tasks, its folder,
   its hosts-file section, its "NightGuard" firewall rules and its shortcuts.
@@ -28,6 +29,11 @@ try {
     $blocked = Get-NGBlockedReason $cfg
     if ($blocked) { throw "Nice try. $blocked" }
     Assert-NGCode $Code
+    # Self-lock: without the trusted person's code, uninstall needs an open unlock (7-day cool-off) and no end date
+    if (-not (Get-NGTrusted)) {
+        $why = Get-NGUninstallBlock $cfg
+        if ($why) { throw $why }
+    }
 
     Remove-NightGuard
     try { & shutdown.exe /a 2>$null } catch { }   # cancel a pending shutdown, if any

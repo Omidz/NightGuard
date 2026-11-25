@@ -103,6 +103,7 @@ function Show-Header {
         }
         if (Get-NGBlockedReason $cfg) { Say 'Night mode : ON, settings and uninstall are locked right now' Magenta }
         if (Get-NGTrusted) { Say 'Trusted    : ON, changes need the trusted person''s code' Cyan }
+        else { Say ("Self-lock  : {0}" -f (Format-NGUnlockText)) DarkYellow }
         if ($cfg.Blocking.Enabled) {
             $bs = if (Test-NGBlockActive $cfg) { 'blocking NOW' } else { 'on schedule' }
             Say ("Blocking   : {0} sites, {1} apps/folders ({2})" -f @($cfg.Blocking.Sites).Count, @($cfg.Blocking.Apps).Count, $bs)
@@ -388,7 +389,23 @@ function Preview-Popups {
 
 function Invoke-Uninstall {
     Show-Header
-    if ((Read-Host '   Really remove NightGuard? (type YES)') -cne 'YES') { return }
+    $cfg = Get-NGConfig
+    # Self-lock: without the trusted person's code, uninstall needs a finished 7-day cool-off (and no end date)
+    $why = if (Get-NGTrusted) { $null } else { Get-NGUninstallBlock $cfg }
+    if ($why) {
+        Say $why Yellow
+        Write-Host ''
+        if (-not (Get-NGEndDate $cfg)) {
+            switch ((Get-NGUnlock).State) {
+                'None'    { if (Ask-YesNo 'Request an unlock? Uninstall becomes possible after a 7-day cool-off' $false) { Request-NGUnlock; Say (Format-NGUnlockText) Green } }
+                'Waiting' { if (Ask-YesNo 'Cancel your unlock request' $false) { Clear-NGUnlock; Say 'Request cancelled. Proud of you.' Green } }
+            }
+        }
+        Pause-Menu
+        return
+    }
+    Say 'This is the moment the cool-off was for. Still sure? NightGuard was helping you sleep.' Yellow
+    if ((Read-Host '   ARE YOU SURE you want to remove NightGuard? (type YES)') -cne 'YES') { return }
     $code = ''
     if (Get-NGTrusted) { $code = Read-Host "   Trusted person's code (8 digits)" }
     & (Join-Path $PSScriptRoot 'uninstall.ps1') -Code $code -NoPause
@@ -407,7 +424,7 @@ while ($true) {
         Say ('[1]  {0}' -f $(if ($installed) { 'Settings' } else { 'Install (review settings first)' }))
         Say '[2]  Details (schedule, tasks, log)'
         Say '[3]  Preview popups'
-        Say '[4]  Uninstall'
+        Say '[4]  Uninstall / request unlock'
         Say '[5]  Open the windowed app (blocking, screen time and trusted person are set up there)'
         Say '[0]  Exit'
         Write-Host ''
