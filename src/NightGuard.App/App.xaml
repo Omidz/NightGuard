@@ -12,6 +12,10 @@
             <SolidColorBrush x:Key="NgSidebar" Color="#1C2034" />
             <SolidColorBrush x:Key="NgSidebarItem" Color="#C0C5DA" />
             <SolidColorBrush x:Key="NgMoon" Color="#FFD666" />
+            <LinearGradientBrush x:Key="NgTipBrush" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#2A2466" Offset="0" />
+                <GradientStop Color="#5A3E9E" Offset="1" />
+            </LinearGradientBrush>
 
             <Style x:Key="PageTitle" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="24" />

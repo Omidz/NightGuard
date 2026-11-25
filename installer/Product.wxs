@@ -28,7 +28,6 @@
     <Icon Id="AppIcon" SourceFile="..\src\NightGuard.App\Assets\NightGuard.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
     <Property Id="ARPNOREMOVE" Value="1" />
-    <Property Id="ARPNOMODIFY" Value="1" />
     <Property Id="ARPNOREPAIR" Value="1" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/Omidz/NightGuard" />
     <Property Id="ARPCOMMENTS" Value="Your bedtime bouncer. Uninstall it from the NightGuard app." />

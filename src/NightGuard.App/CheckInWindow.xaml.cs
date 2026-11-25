@@ -49,7 +49,16 @@ public partial class CheckInWindow : Window
         };
         // A new badge, the first time you reach it (the streak is at a milestone and is your best ever)
         if (info.Kind == "Clean" && info.Streak == info.Best) _badge = Badges.At(info.Streak);
-        if (_badge is not null) { title = $"New badge: {_badge.Name}!"; body = _badge.Line + "\n" + body; }
+        if (_badge is not null)
+        {
+            title = "You earned a badge!";
+            body = _badge.Line + "\n" + body;
+            BadgeCard.Visibility = Visibility.Visible;
+            BadgeCard.Background = Art.NightSky();
+            BadgeName.Text = _badge.Name;
+        }
+        Header.Background = info.Kind == "SteppedIn" ? Art.NightSky() : Art.Sunrise();
+        HeaderEmoji.Text = _badge is not null ? "\U0001F3C6" : info.Kind switch { "Clean" => "\u2600\uFE0F", "SteppedIn" => "\U0001F917", _ => "\U0001F305" };
         if (Badges.Next(Math.Max(info.Best, info.Streak)) is { } next) streak += $"  Next badge: {next.Name} at {next.Nights}.";
 
         TitleText.Text = title;

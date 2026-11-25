@@ -14,27 +14,36 @@
         <Border Grid.Column="0" Background="{DynamicResource LayerFillColorDefaultBrush}"
                 BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
             <DockPanel Margin="14,18,14,14">
-                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,0,0,18">
-                    <Image Source="Assets/NightGuard.ico" Width="32" Height="32" Margin="0,0,10,0" />
-                    <TextBlock Text="NightGuard" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <StackPanel DockPanel.Dock="Top" Margin="6,0,0,18">
+                    <StackPanel Orientation="Horizontal">
+                        <Image Source="Assets/NightGuard.ico" Width="36" Height="36" Margin="0,0,10,0" />
+                        <TextBlock Text="NightGuard" FontSize="24" FontWeight="Bold" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Text="your bedtime bouncer" FontStyle="Italic" Opacity="0.65" Margin="46,-4,0,0" />
                 </StackPanel>
                 <StackPanel DockPanel.Dock="Bottom">
-                    <Button x:Name="JournalButton" Content="My journal" HorizontalAlignment="Stretch" Margin="0,4" Padding="10,7" Click="Journal_Click" />
-                    <Button x:Name="StatusButton" Content="Status and log" HorizontalAlignment="Stretch" Margin="0,4" Padding="10,7" Click="Status_Click" />
-                    <Button x:Name="UninstallButton" Content="Request uninstall..." HorizontalAlignment="Stretch" Margin="0,4" Padding="10,7" Click="Uninstall_Click" />
-                    <Button x:Name="DiscardButton" Content="Discard changes" HorizontalAlignment="Stretch" Margin="0,4" Padding="10,7" Click="Discard_Click" />
+                    <Border CornerRadius="10" Padding="12,10" Margin="0,0,0,10" Background="{StaticResource NgTipBrush}">
+                        <StackPanel>
+                            <TextBlock Text="&#x1F4A1; Tip of the night" FontWeight="SemiBold" Foreground="White" />
+                            <TextBlock x:Name="TipText" TextWrapping="Wrap" Foreground="White" Opacity="0.9" Margin="0,4,0,0" FontSize="12.5" />
+                        </StackPanel>
+                    </Border>
+                    <Button x:Name="JournalButton" Content="&#x1F4D3;  My journal" HorizontalAlignment="Stretch" Margin="0,4" Padding="10,7" Click="Journal_Click" />
+                    <Button x:Name="StatusButton" Content="&#x1F4CA;  Status and log" HorizontalAlignment="Stretch" Margin="0,4" Padding="10,7" Click="Status_Click" />
+                    <Button x:Name="UninstallButton" Content="&#x1F6AA;  Request uninstall..." HorizontalAlignment="Stretch" Margin="0,4" Padding="10,7" Click="Uninstall_Click" />
+                    <Button x:Name="DiscardButton" Content="&#x21A9;&#xFE0F;  Discard changes" HorizontalAlignment="Stretch" Margin="0,4" Padding="10,7" Click="Discard_Click" />
                 </StackPanel>
                 <ListBox x:Name="Steps" SelectionChanged="Steps_SelectionChanged" BorderThickness="0" Background="Transparent" FontSize="15">
-                    <ListBoxItem Content="1.  Welcome" />
-                    <ListBoxItem Content="2.  Bedtimes" />
-                    <ListBoxItem Content="3.  Warnings" />
-                    <ListBoxItem Content="4.  At bedtime" />
-                    <ListBoxItem Content="5.  Your why and journal" />
-                    <ListBoxItem Content="6.  Game and screen time" />
-                    <ListBoxItem Content="7.  Block sites and apps" />
-                    <ListBoxItem Content="8.  Trusted person" />
-                    <ListBoxItem Content="9.  Review and save" />
-                </ListBox>
+                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="👋" FontFamily="Segoe UI Emoji" Foreground="#FFB86B" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Welcome" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
+                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="🛏️" FontFamily="Segoe UI Emoji" Foreground="#8FA2FF" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Bedtimes" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
+                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="⏰" FontFamily="Segoe UI Emoji" Foreground="#FF8A5B" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Warnings" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
+                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="🔌" FontFamily="Segoe UI Emoji" Foreground="#B08CFF" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="At bedtime" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
+                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="💬" FontFamily="Segoe UI Emoji" Foreground="#5EC8E5" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Your why and journal" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
+                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="🎮" FontFamily="Segoe UI Emoji" Foreground="#7ED37E" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Game and screen time" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
+                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="🚫" FontFamily="Segoe UI Emoji" Foreground="#F06A6A" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Block sites and apps" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
+                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="🔐" FontFamily="Segoe UI Emoji" Foreground="#FFD666" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Trusted person" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
+                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="✅" FontFamily="Segoe UI Emoji" Foreground="#4CC38A" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Review and save" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
+                    </ListBox>
             </DockPanel>
         </Border>
 
@@ -66,7 +75,7 @@
                 <!-- 1. Welcome -->
                 <ScrollViewer x:Name="PageWelcome" VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="36,28,36,28" MaxWidth="860" HorizontalAlignment="Left">
-                        <TextBlock x:Name="WelcomeTitle" Style="{StaticResource PageTitle}" FontSize="30" Text="Hi there, night owl!" />
+                        <local:NightScene x:Name="Scene" Headline="Hi there, night owl! &#x1F989;" Tagline="Let's get you to bed on time. Future you is already grateful." />
                         <TextBlock x:Name="WelcomeText" Style="{StaticResource Lead}" FontSize="15" LineHeight="24" />
                         <Border x:Name="StatusCard" Style="{StaticResource Card}" Visibility="Collapsed">
                             <TextBlock x:Name="StatusCardText" TextWrapping="Wrap" FontSize="14" LineHeight="22" />
@@ -77,7 +86,7 @@
                 <!-- 2. Bedtimes -->
                 <ScrollViewer x:Name="PageBedtimes" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
                     <StackPanel Margin="36,28,36,28">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Bedtimes" />
+                        <local:PageHeader Emoji="🛏️" EmojiColor="#C9D2FF" Title="Bedtimes" Subtitle="Pick when the bouncer starts its shift." />
                         <TextBlock Style="{StaticResource Lead}" Text="When should your PC tuck you in? Tick the nights NightGuard should guard. Each night is named after the evening it starts, so a 12:30 AM bedtime on Monday night means early Tuesday morning." />
                         <TextBlock x:Name="TimeHintText" Style="{StaticResource Hint}" Margin="0,0,0,12" />
                         <Grid>
@@ -106,7 +115,7 @@
                 <!-- 3. Warnings -->
                 <ScrollViewer x:Name="PageWarnings" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
                     <StackPanel Margin="36,28,36,28">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Warnings" />
+                        <local:PageHeader Emoji="⏰" EmojiColor="#FFD0B0" Title="Warnings" Subtitle="Friendly nudges first. Then less friendly ones. 😅" />
                         <TextBlock Style="{StaticResource Lead}" Text="Popups that nudge you before bedtime: gentle at first, then less gentle. Tick the ones you want (up to 6), and click Preview to see exactly how each one looks." />
                         <Grid x:Name="WarningsGrid" />
                         <Grid Margin="0,18,0,0">
@@ -140,7 +149,7 @@
                 <!-- 4. At bedtime -->
                 <ScrollViewer x:Name="PageAction" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
                     <StackPanel Margin="36,28,36,28" MaxWidth="900" HorizontalAlignment="Left">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="At bedtime" />
+                        <local:PageHeader Emoji="🔌" EmojiColor="#E0D0FF" Title="At bedtime" Subtitle="Time's up. How should your PC say goodnight?" />
                         <TextBlock Style="{StaticResource Lead}" Text="Bedtime has arrived. Your game disagrees. Here's how NightGuard settles the argument." />
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -189,7 +198,7 @@
                 <!-- 5. Your why and journal -->
                 <ScrollViewer x:Name="PageWhy" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
                     <StackPanel Margin="36,28,36,28" MaxWidth="900" HorizontalAlignment="Left">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Why are you doing this?" />
+                        <local:PageHeader Emoji="💬" EmojiColor="#BFEFFF" Title="Why are you doing this?" Subtitle="The one sentence that beats &quot;just one more game&quot;." />
                         <TextBlock Style="{StaticResource Lead}" Text="Optional, but we HIGHLY recommend it. Write one or two sentences to future you. At 11:55 PM, mid-game, &quot;be healthier&quot; is easy to ignore. &quot;I want to stop being a zombie at work&quot; hits different. NightGuard shows it in the final warning, the bedtime countdown and your morning check-in." />
                         <TextBox x:Name="WhyBox" MaxLength="300" Height="80" TextWrapping="Wrap" AcceptsReturn="False" FontSize="16" TextChanged="WhyBox_TextChanged" />
                         <TextBlock x:Name="WhyCount" Style="{StaticResource Hint}" />
@@ -206,7 +215,7 @@
                 <!-- 6. Game and screen time -->
                 <ScrollViewer x:Name="PageScreen" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
                     <StackPanel Margin="36,28,36,28">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Game and screen time" />
+                        <local:PageHeader Emoji="🎮" EmojiColor="#C8F2C8" Title="Game and screen time" Subtitle="&quot;Just one more game&quot; now comes with a budget." />
                         <DockPanel Margin="0,0,0,14">
                             <TextBlock x:Name="UsageText" DockPanel.Dock="Right" FontFamily="Consolas" TextWrapping="Wrap" MaxWidth="420" Opacity="0.85" />
                             <CheckBox x:Name="ScreenCheck" Content="Turn on daily game and screen time budgets" FontWeight="SemiBold" FontSize="15"
@@ -258,7 +267,7 @@
                 <!-- 7. Block sites and apps -->
                 <ScrollViewer x:Name="PageBlock" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
                     <StackPanel Margin="36,28,36,28">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Block sites and apps" />
+                        <local:PageHeader Emoji="🚫" EmojiColor="#FFC2C2" Title="Block sites and apps" Subtitle="Goodbye, 1 AM doomscrolling. 👋" />
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
                             <CheckBox x:Name="BlockCheck" Content="Turn on site and app blocking (goodbye, 1 AM doomscrolling)" FontWeight="SemiBold" FontSize="15"
                                       Checked="Section_Changed" Unchecked="Section_Changed" />
@@ -295,7 +304,7 @@
                 <!-- 8. Trusted person -->
                 <ScrollViewer x:Name="PageTrusted" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
                     <StackPanel Margin="36,28,36,28" MaxWidth="900" HorizontalAlignment="Left">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Trusted person" />
+                        <local:PageHeader Emoji="🔐" EmojiColor="#FFE9A8" Title="Trusted person" Subtitle="Know yourself too well? Hand the off switch to someone else." />
                         <TextBlock Style="{StaticResource Lead}" Text="Know yourself too well? Hand the off switch to someone else. A trusted person (parent, partner, friend, the roommate who's tired of hearing you game at 3 AM) sets a secret 8-digit code. After that, changing settings or uninstalling needs their code." />
                         <CheckBox x:Name="TrustCheck" Content="Use a trusted-person code" FontWeight="SemiBold" FontSize="15" Checked="TrustCheck_Changed" Unchecked="TrustCheck_Changed" />
                         <TextBlock x:Name="TrustState" TextWrapping="Wrap" Margin="0,10,0,0" FontSize="14" />
@@ -321,16 +330,16 @@
                 <!-- 9. Review and save -->
                 <DockPanel x:Name="PageReview" Visibility="Collapsed" Margin="36,28,36,18">
                     <StackPanel DockPanel.Dock="Top">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Last stop: review and save" />
+                        <local:PageHeader Emoji="✅" EmojiColor="#C3F2DB" Title="Last stop: review and save" Subtitle="Check it twice. Then go be well-rested. ✨" />
                         <TextBlock Style="{StaticResource Lead}" Text="Check it twice: once NightGuard is running, stricter changes are instant, but looser ones and uninstalling need a 7-day cool-off." />
                     </StackPanel>
                     <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
                         <CheckBox x:Name="DesktopCheck" Content="Also put a NightGuard shortcut on the desktop (it's always in the Start Menu)" />
                         <TextBlock Style="{StaticResource Hint}" Text="Taskbar: Windows doesn't let apps pin themselves, so right-click NightGuard in the Start Menu > Pin to taskbar." />
-                        <CheckBox x:Name="ConfirmCheck" Content="Yes, these settings are correct." FontWeight="SemiBold" FontSize="15" Margin="0,14,0,0"
+                        <CheckBox x:Name="ConfirmCheck" Content="Yes, these settings are correct. Let's do this! &#x1F4AA;" FontWeight="SemiBold" FontSize="15" Margin="0,14,0,0"
                                   Checked="ConfirmCheck_Changed" Unchecked="ConfirmCheck_Changed" />
                     </StackPanel>
-                    <TextBox x:Name="ReviewBox" IsReadOnly="True" FontFamily="Consolas" FontSize="13.5" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
+                    <TextBox x:Name="ReviewBox" IsReadOnly="True" FontSize="14" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
                 </DockPanel>
             </Grid>
         </DockPanel>
