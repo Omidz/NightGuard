@@ -22,6 +22,13 @@ if ($unsafe) { Write-NGLog "not enforcing: $unsafe"; exit 0 }
 
 $night = Get-NGCurrentNight $cfg
 if (-not $night) { exit 0 }
+# Someone was actually using the PC during a locked night (signed in, screen not locked):
+# no "clean night" for the morning check-in streak. A PC woken from sleep to the lock screen doesn't count.
+try {
+    $user = (Get-CimInstance Win32_ComputerSystem).UserName
+    $lockScreen = [bool](Get-Process -Name LogonUI -ErrorAction SilentlyContinue)
+    if ($user -and -not $lockScreen) { Add-NGSteppedIn $night.Evening }
+} catch { }
 
 $secs = [int]$cfg.CountdownSeconds
 switch ([string]$cfg.Action) {
