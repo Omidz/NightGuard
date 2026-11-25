@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  NightGuard installer.
+  - Installs to C:\Program Files\NightGuard (only administrators can change it).
+  - Installs and starts the NightGuard service (LocalSystem, automatic, restarts itself if it fails).
+  - Start Menu shortcut. The service starts the tray app for every signed-in user.
+  - Uninstall is gated: NightGuard removes itself through its own app (after the 7-day cool-off or with
+    the trusted person's code), or after its end date. A plain "Uninstall" is refused with a pointer to
+    the app. Administrators can still force it (see the README, "Removing it by hand").
+  - Data (settings, journal, log) lives in C:\ProgramData\NightGuard and survives upgrades.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <Package Name="NightGuard" Manufacturer="NightGuard" Version="$(var.ProductVersion)"
+           UpgradeCode="378FAA9D-BA70-46A4-9F3D-DAB3B311DCC6" Scope="perMachine" Compressed="yes" Language="1033">
+
+    <MajorUpgrade Schedule="afterInstallInitialize" AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of NightGuard is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Launch Condition="VersionNT64" Message="NightGuard needs 64-bit Windows 10 or 11." />
+    <!-- The self-lock: uninstalling goes through the NightGuard app (or the end date), not Add/Remove Programs. -->
+    <Launch Condition="NOT (REMOVE~=&quot;ALL&quot;) OR UPGRADINGPRODUCTCODE OR NIGHTGUARD_UNINSTALL=&quot;1&quot;"
+            Message="NightGuard is locked in. To uninstall it, open NightGuard and use &quot;Request uninstall&quot; (7-day cool-off, or your trusted person's code). After its end date, it removes itself." />
+
+    <Icon Id="AppIcon" SourceFile="..\src\NightGuard.App\Assets\NightGuard.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPNOREMOVE" Value="1" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/Omidz/NightGuard" />
+    <Property Id="ARPCOMMENTS" Value="Your bedtime bouncer. Uninstall it from the NightGuard app." />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="NightGuard" />
+    </StandardDirectory>
+
+    <!-- Everything that was published, except the service executable (it gets its own component below) -->
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.PublishDir)**">
+        <Exclude Files="$(var.PublishDir)NightGuard.Service.exe" />
+      </Files>
+    </ComponentGroup>
+
+    <ComponentGroup Id="Service" Directory="INSTALLFOLDER">
+      <Component Id="ServiceExe" Bitness="always64">
+        <File Id="ServiceExeFile" Source="$(var.PublishDir)NightGuard.Service.exe" KeyPath="yes" />
+        <ServiceInstall Id="NightGuardService" Name="NightGuard" DisplayName="NightGuard"
+                        Description="Your bedtime bouncer: warnings, bedtime, blocking and screen time. Uninstall it from the NightGuard app."
+                        Type="ownProcess" Start="auto" ErrorControl="normal" Account="LocalSystem" Vital="yes">
+          <util:ServiceConfig FirstFailureActionType="restart" SecondFailureActionType="restart" ThirdFailureActionType="restart"
+                              RestartServiceDelayInSeconds="5" ResetPeriodInDays="1" />
+        </ServiceInstall>
+        <ServiceControl Id="NightGuardServiceControl" Name="NightGuard" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut" Guid="6C1A7F3E-2B7D-4C1E-9A55-3F0B8E2D4A11">
+        <Shortcut Id="AppShortcut" Name="NightGuard" Description="Your bedtime bouncer"
+                  Target="[INSTALLFOLDER]NightGuard.exe" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
+        <RegistryValue Root="HKLM" Key="Software\NightGuard" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="NightGuard" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentGroupRef Id="Service" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+
+    <!-- Uninstall / upgrade: close the app everywhere and remove the watchdog while the service still runs,
+         then (after the service has stopped) remove blocks, tasks and, unless upgrading, the data folder. -->
+    <CustomAction Id="NG_Prepare" FileRef="ServiceExeFile" ExeCommand="--prepare-uninstall" Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="NG_Cleanup" FileRef="ServiceExeFile" ExeCommand="--cleanup" Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="NG_CleanupPurge" FileRef="ServiceExeFile" ExeCommand="--cleanup --purge" Execute="deferred" Impersonate="no" Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="NG_Prepare" Before="StopServices" Condition="REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="NG_Cleanup" After="StopServices" Condition="REMOVE~=&quot;ALL&quot; AND UPGRADINGPRODUCTCODE" />
+      <Custom Action="NG_CleanupPurge" After="NG_Cleanup" Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
+
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+    <ui:WixUI Id="WixUI_Minimal" />
+  </Package>
+</Wix>
