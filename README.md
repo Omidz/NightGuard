@@ -16,7 +16,7 @@ NightGuard warns you before bedtime, then **shuts your PC down** (or puts it to 
 - 📅 **Different bedtime per night.** Strict on school or work nights, chill on Friday.
 - 🎮 **Daily game and screen time budgets** (optional). "1 hour of games on weekdays" actually means 1 hour. Then the games close. Rude, but fair.
 - 🚫 **Blocks distractions on a schedule** (optional). Social media sites and apps like Discord or Steam, during bedtime or during your focus hours.
-- 🔐 **Trusted-person mode** (optional). Give an 8-digit code to a friend or parent. Without it, you can't change settings or uninstall. No more "I'll just disable it tonight".
+- 🔐 **Trusted-person mode** (optional). A friend or parent types in their own secret 8-digit code. Without it, you can't change settings or uninstall. No more "I'll just disable it tonight".
 - 🌘 **Night mode.** In the last hour before bedtime, settings are locked. Past-you made a decision. Present-you doesn't get a vote.
 - 🏁 **End date** (optional). Do a 30-day challenge and NightGuard removes itself afterwards.
 
@@ -27,7 +27,7 @@ NightGuard warns you before bedtime, then **shuts your PC down** (or puts it to 
 1. Click the green **Code** button above, then **Download ZIP**.
 2. Unzip it anywhere, for example your Downloads folder.
 3. Double-click **`NightGuard.cmd`** and click **Yes** on the admin prompt.
-4. Click through the setup wizard. The defaults are sensible, so **Next, Next, Next** is fine. Check the **Review** step and click **Install NightGuard**. Done. Go to bed. (Well, at bedtime.)
+4. Click through the setup wizard. The defaults are sensible, so **Next, Next, Next** is fine. On the last step, check the summary, tick **Yes, these settings are correct**, and click **Install NightGuard**. Done. Go to bed. (Well, at bedtime.)
 
 After that, open NightGuard from **Start Menu > NightGuard**.
 
@@ -59,32 +59,48 @@ Once it's installed, the Start Menu shortcut won't be blocked again.
 
 ## 🎛️ Settings
 
-NightGuard opens as a step-by-step wizard. Use **Next** and **Back**, or jump to any step in the list on the left. Nothing changes until you click **Save and apply** (or **Install NightGuard** the first time). To change something later, open NightGuard again and go straight to that step.
+NightGuard opens as a step-by-step wizard. Use **Next** and **Back**, or jump to any step in the list on the left. Nothing is installed or changed until the last step, **Review and install**: read the summary, tick **Yes, these settings are correct**, and the **Install NightGuard** button appears (it says **Save and apply** once NightGuard is installed). To change something later, open NightGuard again and go straight to that step.
+
+Sections you switch off (like screen time or blocking) are greyed out, so you can see at a glance what's on. **Status and log** and **Uninstall** live at the bottom left, out of the wizard's way.
 
 Times are shown the same way as your Windows clock: 12-hour with AM/PM, or 24-hour. Each time box is labelled with the format it uses. Click the hour or minute and use the arrows, or just type.
 
 | Step | What you can set | Default |
 |---|---|---|
 | **Bedtimes** | Bedtime and unlock time for each night. Untick nights to leave them free. Use the **Set several nights at once** box to give every night, school nights or weekend nights the same times in one click. Each row shows which hours get locked. | Every night, 00:00 to 06:00 |
-| **Warnings** | Up to 6 popups: how many minutes before, the message, sound on or off | 30 and 5 minutes before |
-| **At bedtime** | Shutdown, Sleep, Hibernate, Lock or Sign out. Countdown length, how often it repeats, night mode length, end date. | Shutdown, 60 s countdown, repeats every 5 min |
+| **Warnings** | Up to 6 popups: how many minutes before, the message, sound on or off. **Preview** any popup, or the bedtime countdown, right there. | 30 and 5 minutes before |
+| **At bedtime** | Hibernate, Shutdown, Sleep, Lock or Sign out. Countdown length, how often it repeats, night mode length, end date. | Hibernate, 60 s countdown, repeats every minute |
 | **Game and screen time** | Daily game and screen time budgets (weekdays and weekends), warnings, what happens when time runs out, which programs count as games | Off (1 h games / 4 h screen on weekdays, 2 h / 6 h at weekends when you turn it on) |
 | **Block sites and apps** | Websites, apps or whole folders to block, and when | Off (a social media list is ready to go) |
-| **Trusted person** | Turn on the code lock | Off |
+| **Trusted person** | Turn on the code lock. Your trusted person types their own code when you install or save. | Off |
 
 **How nights are named:** after the evening they start. A bedtime before 12:00 counts as *after midnight*, so "Mon 00:30" means 12:30 AM, early Tuesday.
 
-**Warning messages** can use `{minutes}`, `{bedtime}`, `{unlock}` and `{action}`, which fill in automatically. Use `\n` for a new line.
+### ✍️ Writing popups that actually work on you
+
+These fill themselves in: `{minutes}` (minutes left), `{bedtime}`, `{unlock}` and `{action}` (like "hibernate"). Type `\n` for a new line.
+
+- Keep it short: one line of news, one line of what to do.
+- Start kind, get firmer. Future you responds better to a plan than a lecture.
+- 30 minutes before: `Heads up! Bedtime in {minutes} minutes.\nWrap up this round.`
+- 5 minutes before: `FINAL WARNING!\nThe PC will {action} at {bedtime}. Save NOW.`
+
+Click **Fill in example messages** on the Warnings step to start from these, and **Preview** to see exactly how each popup looks.
 
 ### Which bedtime action?
 
 | Action | Strength | The vibe |
 |---|---|---|
+| Hibernate (default, recommended) | 💪💪 | Saves your open stuff to disk, then powers off. Switch on after unlock time and it's all still there. |
 | Shutdown | 💪💪💪 | Closes everything. Unsaved work is gone. Very effective. |
-| Hibernate | 💪💪 | Saves your open stuff to disk, then powers off. |
 | Sleep | 💪 | Quick to resume, but it'll keep putting itself back to sleep. |
 | Sign out | 💪 | Closes your apps and signs you out, again and again. |
 | Lock | 🪶 | Just locks the screen. Fine if you only need a nudge. |
+
+**About Hibernate.** It's the default because it's strong *and* kind: the PC really powers off, but your open apps come back when you switch it on again (and if you switch it on during locked hours, it hibernates again after the countdown). Two honest caveats:
+
+- **It usually keeps your unsaved work, but it can't guarantee it.** A game that's online may disconnect, a Windows update or a power cut can still lose things. Save at the warnings anyway.
+- **Hibernate has to be switched on in Windows.** It's off on many desktop PCs. When you install with Hibernate picked, NightGuard checks and, **if you say yes**, turns it on for you (`powercfg /hibernate on`). Windows then sets aside some disk space for it (a file about half the size of your RAM). If you say no, or your PC can't hibernate, NightGuard **shuts down instead**. Uninstalling NightGuard leaves the Windows hibernate setting as it is.
 
 ---
 
@@ -100,17 +116,25 @@ Turn them on in the **Game and screen time** step.
 
 ## 🔐 Trusted-person mode
 
-You give an 8-digit code to someone you trust. From then on, **changing any setting or uninstalling needs the code.** NightGuard shows the code once, then helps you email, copy or print it.
+Someone you trust (a parent, partner, friend, or the roommate who's tired of hearing you game at 3 AM) picks their own 8-digit code. From then on, **changing any setting or uninstalling needs the code.**
+
+How it works:
+
+1. Tick **Use a trusted-person code** on the Trusted person step.
+2. On the last step, NightGuard double-checks you really understand the risk before the Install button appears.
+3. Right after you click **Install** (or **Save**), hand the keyboard to your trusted person. They type their code twice, hidden. **NightGuard never shows, emails or prints it**, so you never see it. That's the whole point.
+
+Too-easy codes like `12345678`, `00000000`, `12121212` or a birthday are refused.
 
 > ### ⚠️ READ THIS. SERIOUSLY.
 >
-> **If the code is lost, there is NO way to recover it.** Not you, not your trusted person, not us. NightGuard only keeps a scrambled copy (a salted hash), so it can't tell you the code.
+> **If the code is forgotten, there is NO way to recover it.** Not you, not your trusted person, not us. NightGuard only keeps a scrambled copy (a salted hash), so it can't tell anyone the code.
 >
-> - **Give the code to your trusted person before you turn it on.** Print it, email it, write it on paper. Keep it somewhere safe.
-> - **Don't keep the only copy yourself**, or you'll just type it in at 1 AM. (We know you.)
+> - **Your trusted person has to remember it or store it safely** (a password manager is perfect). Not on a sticky note next to your PC.
+> - **Don't ask them to tell you.** You'll just type it in at 1 AM. (We know you.)
 > - Wrong guesses lock the code box for 15 minutes after 5 tries, and longer after each further try.
 >
-> **You GOT to have the code.**
+> **They GOT to have the code.**
 
 Things that still work without the code, so you're never truly stuck:
 
@@ -167,9 +191,9 @@ If it's during locked hours, boot into **Safe Mode** first (hold **Shift** while
 
 NightGuard is young. It's built carefully, but it hasn't been battle-tested on lots of PCs yet. Do a quick daytime test:
 
-1. Open NightGuard and click **Preview warning** and **Preview countdown** on the Welcome step.
-2. On the Bedtimes step, set *tonight's* night to a time a few minutes from now (for example bedtime 3:10 PM, unlocks 3:40 PM), set **Night mode** to `0` on the At bedtime step, and save.
-3. Watch the warnings, then the shutdown. Turn the PC on again and check it shuts down again.
+1. Open NightGuard, go to the Warnings step and click **Preview** on a popup and **Preview the bedtime countdown**.
+2. On the Bedtimes step, set *tonight's* night to a time a few minutes from now (for example bedtime 3:10 PM, unlocks 3:40 PM), set **Night mode** to `0` on the At bedtime step, and save on the last step. (Leave the trusted-person code off while testing.)
+3. Watch the warnings, then the countdown and hibernate (or shutdown). Turn the PC on again and check it happens again about a minute later.
 4. After the unlock time, set your real schedule.
 
 Something weird? [Open an issue](../../issues). Bug reports from fellow procrastinators are very welcome (ideally filed before midnight 😉).
@@ -211,7 +235,13 @@ No. No internet, no accounts, no tracking. It's a few PowerShell scripts you can
 Set your own bedtime and unlock time per night. Any time works, as long as there are at least 6 free hours between nights.
 
 **Will it close my game without saving?**
-With Shutdown, yes, after the countdown. That's why there are warnings. Save at the 5-minute warning. 🙂
+With Shutdown, yes, after the countdown. With Hibernate (the default) your game is usually still there when you switch the PC back on, but don't bet your save file on it. That's why there are warnings. Save at the 5-minute warning. 🙂
+
+**Will it slow down my PC or my games?**
+Nope. NightGuard isn't a program that sits in the background. Windows wakes a tiny script now and then (every minute for screen time or at night, every 5 minutes for blocking), it does its thing in a second or two, and it's gone again. No always-on background app, no meaningful memory use. Your FPS won't notice. Your sleep schedule will.
+
+**Why does it repeat every minute at night? Isn't that a lot?**
+Each check is a blink, and only during locked hours. Every minute means that if you switch the PC back on at 2 AM, you get about a minute before it goes back to bed. You can make it less often on the At bedtime step, but where's the fun in that.
 
 ---
 
