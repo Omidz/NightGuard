@@ -245,9 +245,30 @@ function Read-NGConfigFile([string]$Path) {
     return (Copy-NGConfig $raw)   # also fills in Blocking for version 2
 }
 
+# Returns the installed settings, or $null if there are none or the file can't be read.
+# Callers treat $null as "do nothing", so a damaged settings file never causes a shutdown.
 function Get-NGConfig {
     $f = Join-Path $NGDir 'config.json'
-    if (Test-Path $f) { return Read-NGConfigFile $f }
+    if (Test-Path $f) {
+        try { return Read-NGConfigFile $f }
+        catch { Write-NGLog "settings file can't be read, doing nothing: $($_.Exception.Message)"; return $null }
+    }
+    return $null
+}
+
+# Safety gate used by everything that enforces: settings must exist, be valid,
+# and the clock must look right. Returns $null when it's safe to act, or the reason not to.
+function Get-NGUnsafeReason($Cfg) {
+    if (-not $Cfg) { return 'no settings' }
+    $errs = Test-NGConfig $Cfg
+    if ($errs.Count -gt 0) { return "settings are invalid: $($errs[0])" }
+    # A clock far in the past (dead CMOS battery, BIOS reset) could otherwise
+    # cause a shutdown at every boot. Settings saved "in the future" means the clock is wrong.
+    $f = Join-Path $NGDir 'config.json'
+    if (Test-Path $f) {
+        $saved = (Get-Item $f).LastWriteTime
+        if ((Get-Date) -lt $saved.AddDays(-1)) { return "the clock looks wrong ($(Get-Date -Format 'yyyy-MM-dd HH:mm') is before the settings were saved)" }
+    }
     return $null
 }
 
@@ -266,6 +287,10 @@ function Test-NGProtectedPath([string]$P) {
         if ($full -eq $bad -or $full.StartsWith("$bad\", [StringComparison]::OrdinalIgnoreCase)) { return $true }
     }
     if ($full.Length -le 3) { return $true }   # a whole drive
+    # Whole top-level folders would catch far too much (browsers, drivers, Windows tools)
+    foreach ($root in @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:ProgramData, $env:USERPROFILE, $env:LOCALAPPDATA, $env:APPDATA, (Split-Path $env:USERPROFILE -Parent))) {
+        if ($root -and $full -eq $root.TrimEnd('\')) { return $true }
+    }
     return $false
 }
 
@@ -488,15 +513,36 @@ function Get-NGHostsDomains($Cfg) {
     return , $out.ToArray()
 }
 
+function Remove-NGHostsSection([string]$Text) {
+    # Removes our marked section line by line. If the end marker is missing (hand-edited
+    # file), only the "0.0.0.0" lines straight after the start marker are removed.
+    $out = New-Object System.Collections.Generic.List[string]
+    $inside = $false
+    $lines = $Text -split "`r?`n"
+    $hasEnd = @($lines | Where-Object { $_.StartsWith("# <<< $NGAppName END") }).Count -gt 0
+    foreach ($l in $lines) {
+        if ($l.StartsWith("# >>> $NGAppName BEGIN")) { $inside = $true; continue }
+        if ($inside) {
+            if ($l.StartsWith("# <<< $NGAppName END")) { $inside = $false; continue }
+            if ($hasEnd -or $l -match '^0\.0\.0\.0\s') { continue }
+            $inside = $false
+        }
+        $out.Add($l)
+    }
+    $r = ($out -join "`r`n")
+    return $r
+}
+
 # Writes (or removes, when $Domains is empty) the NightGuard section. Returns $true if the file changed.
 function Set-NGHostsBlock([string[]]$Domains) {
     $orig = ''
     if (Test-Path $NGHosts) { $orig = [IO.File]::ReadAllText($NGHosts) }
-    $pattern = '(?ms)^# >>> ' + [regex]::Escape($NGAppName) + ' BEGIN.*?^# <<< ' + [regex]::Escape($NGAppName) + ' END[^\n]*\n?'
-    $clean = [regex]::Replace($orig, $pattern, '')
+    $clean = Remove-NGHostsSection $orig
+    if ($clean -ceq (($orig -split "`r?`n") -join "`r`n")) { $clean = $orig }   # untouched: keep exact bytes
     $new = $clean
     if ($Domains -and $Domains.Count -gt 0) {
-        if ($new.Length -gt 0 -and -not $new.EndsWith("`n")) { $new += "`r`n" }
+        $new = $new.TrimEnd("`r", "`n") + "`r`n"
+        if ($new -eq "`r`n") { $new = '' }
         $lines = @($NGHostsBegin) + ($Domains | ForEach-Object { "0.0.0.0 $_" }) + @($NGHostsEnd)
         $new += ($lines -join "`r`n") + "`r`n"
     }
