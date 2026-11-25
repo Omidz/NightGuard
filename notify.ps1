@@ -12,14 +12,24 @@ try {
     if (((Get-Date) - $sent).TotalMinutes -gt 2) { exit 0 }
 } catch { }
 
-$shell = New-Object -ComObject WScript.Shell
-$flags = 0x40 + 0x1000   # information icon + stay on top
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+if ($req.Lock) { [System.Media.SystemSounds]::Exclamation.Play() } else { [System.Media.SystemSounds]::Asterisk.Play() }
+Show-NGToast 'NightGuard' ([string]$req.Message)
 
-if ($req.Lock) {
-    [System.Media.SystemSounds]::Exclamation.Play()
-    $null = $shell.Popup([string]$req.Message, 10, 'NightGuard', $flags)
-    & "$env:SystemRoot\System32\rundll32.exe" 'user32.dll,LockWorkStation'
-} else {
-    [System.Media.SystemSounds]::Asterisk.Play()
-    $null = $shell.Popup([string]$req.Message, 60, 'NightGuard', $flags)
-}
+# Always-on-top window that pulls itself in front of games; closes itself after 10 s (lock) or 60 s
+$form = New-Object System.Windows.Forms.Form -Property @{
+    Text = 'NightGuard'; StartPosition = 'CenterScreen'; Width = 500; Height = 220; FormBorderStyle = 'FixedDialog'
+    MaximizeBox = $false; MinimizeBox = $false; BackColor = [System.Drawing.Color]::White }
+$lbl = New-Object System.Windows.Forms.Label -Property @{ Location = (New-Object System.Drawing.Point(16, 16)); Size = (New-Object System.Drawing.Size(452, 110))
+    Font = (New-Object System.Drawing.Font('Segoe UI', 11)); Text = [string]$req.Message }
+$ok = New-Object System.Windows.Forms.Button -Property @{ Text = 'OK'; Location = (New-Object System.Drawing.Point(368, 130)); Size = (New-Object System.Drawing.Size(100, 34)); DialogResult = 'OK' }
+$form.Controls.AddRange(@($lbl, $ok)); $form.AcceptButton = $ok
+$close = New-Object System.Windows.Forms.Timer -Property @{ Interval = $(if ($req.Lock) { 10000 } else { 60000 }) }
+$close.Add_Tick({ $close.Stop(); $form.Close() })
+$form.Add_Shown({ $close.Start() })
+Enable-NGStayOnTop $form 3
+[void]$form.ShowDialog()
+$close.Dispose(); $form.Dispose()
+
+if ($req.Lock) { & "$env:SystemRoot\System32\rundll32.exe" 'user32.dll,LockWorkStation' }

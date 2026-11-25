@@ -194,6 +194,7 @@ $tStatus = New-Tab 'Welcome'
 $tSched  = New-Tab 'Bedtimes'
 $tWarn   = New-Tab 'Warnings'
 $tAct    = New-Tab 'At bedtime'
+$tWhy    = New-Tab 'Your why and journal'
 $tScreen = New-Tab 'Game and screen time'
 $tBlock  = New-Tab 'Block sites and apps'
 $tTrust  = New-Tab 'Trusted person'
@@ -271,11 +272,12 @@ We'll walk through a few short steps together:
 
    1.  Bedtimes: when your nights start and end.
    2.  Warnings: friendly (then less friendly) popups before bedtime.
-   3.  At bedtime: what your PC does when time is up, plus a morning cheer.
-   4.  Game and screen time: daily budgets, if you want them.
-   5.  Block sites and apps: goodbye, 1 AM doomscrolling (optional).
-   6.  Trusted person: hand the off switch to someone else (optional).
-   7.  Review and install: check everything, then switch it on.
+   3.  At bedtime: what your PC does when time is up.
+   4.  Your why and journal: your reason, a morning cheer, streaks and badges.
+   5.  Game and screen time: daily budgets, if you want them.
+   6.  Block sites and apps: goodbye, 1 AM doomscrolling (optional).
+   7.  Trusted person: hand the off switch to someone else (optional).
+   8.  Review and install: check everything, then switch it on.
 
 The defaults are sensible, so if you're not sure about something, just click Next. Nothing gets installed until the very last page.
 
@@ -364,18 +366,27 @@ function Show-JournalDialog {
     $avg = if ($moods.Count) { 'average mood lately: {0:0.0} out of 5' -f ($moods | Measure-Object -Average).Average } else { 'no moods logged yet' }
     $streak = if ($rep) { "Current streak: $($rep.Streak) clean night(s)" } else { 'Streak: shown in the morning' }
     New-Ctl 'Label' $d @{ Text = "$streak   |   $($entries.Count) entries   |   $avg"; Location = (P 12 12); Size = (S 840 24); Font = $FontRowB } | Out-Null
-    $lv = New-Ctl 'ListView' $d @{ Location = (P 12 44); Size = (S 840 460); View = 'Details'; FullRowSelect = $true; GridLines = $true; Font = $FontRow }
-    foreach ($c in @(@('Date', 120), @('Mood', 80), @('Last night', 120), @('Streak', 70), @('Note', 440))) { [void]$lv.Columns.Add($c[0], $c[1]) }
+    $best = if ($rep) { [math]::Max($rep.Best, $rep.Streak) } else { 0 }
+    $earned = @(Get-NGBadges $best)
+    $nextB = Get-NGNextBadge $best
+    $badgeTxt = if ($earned.Count) { 'Badges (' + $earned.Count + ' of ' + $NGBadges.Count + '): ' + (($earned | ForEach-Object { $_.Name }) -join ', ') } else { 'Badges: none yet. First one after your first clean night!' }
+    if ($nextB) { $badgeTxt += "`nNext: $($nextB.Name) at $($nextB.Nights) clean nights in a row (best so far: $best)." } else { $badgeTxt += "`nAll badges earned. A full year. You absolute legend." }
+    New-Ctl 'Label' $d @{ Text = $badgeTxt; Location = (P 12 40); Size = (S 840 40); ForeColor = [System.Drawing.Color]::FromArgb(190, 90, 0) } | Out-Null
+    $whyTxt = if ($cfg -and $cfg.Why) { 'Why I started: ' + [char]0x201C + $cfg.Why + [char]0x201D } else { 'Why I started: not written yet. Add it on the "Your why and journal" step. Highly recommended!' }
+    New-Ctl 'Label' $d @{ Text = $whyTxt; Location = (P 12 82); Size = (S 840 36); Font = (New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Italic)); ForeColor = [System.Drawing.Color]::FromArgb(40, 50, 120) } | Out-Null
+    $lv = New-Ctl 'ListView' $d @{ Location = (P 12 122); Size = (S 840 382); View = 'Details'; FullRowSelect = $true; GridLines = $true; Font = $FontRow }
+    foreach ($c in @(@('Date', 110), @('Mood', 80), @('Last night', 120), @('Streak', 60), @('Badge', 130), @('Note', 330))) { [void]$lv.Columns.Add($c[0], $c[1]) }
     $nightWords = @{ Clean = 'clean'; SteppedIn = 'bouncer stepped in'; Free = 'free night' }
     foreach ($e in $entries) {
         $it = New-Object System.Windows.Forms.ListViewItem ([string]$e.Date)
         [void]$it.SubItems.Add($(if ([int]$e.Mood -gt 0) { "$($e.Mood) $($NGMoodNames[[int]$e.Mood])" } else { '' }))
         [void]$it.SubItems.Add([string]$nightWords[[string]$e.LastNight])
         [void]$it.SubItems.Add([string]$e.Streak)
+        [void]$it.SubItems.Add([string]$e.Badge)
         [void]$it.SubItems.Add([string]$e.Note)
         [void]$lv.Items.Add($it)
     }
-    if ($entries.Count -eq 0) { New-Ctl 'Label' $d @{ Text = 'Nothing here yet. Your morning check-ins will show up here.'; Location = (P 30 120); Size = (S 600 24); BackColor = [System.Drawing.Color]::White } | Out-Null; $lv.SendToBack() }
+    if ($entries.Count -eq 0) { New-Ctl 'Label' $d @{ Text = 'Nothing here yet. Your morning check-ins will show up here.'; Location = (P 30 170); Size = (S 600 24); BackColor = [System.Drawing.Color]::White } | Out-Null; $lv.SendToBack() }
     $bExp = New-Ctl 'Button' $d @{ Text = 'Save a copy...'; Location = (P 12 514); Size = (S 130 32); Enabled = ($entries.Count -gt 0) }
     $bC = New-Ctl 'Button' $d @{ Text = 'Close'; Location = (P 752 514); Size = (S 100 32); DialogResult = 'Cancel' }
     New-Ctl 'Label' $d @{ Text = 'Your journal is deleted when NightGuard is uninstalled, so save a copy if you want to keep it.'; Location = (P 152 520); Size = (S 590 22); ForeColor = $Gray } | Out-Null
@@ -569,9 +580,23 @@ $chkEnd.Add_CheckedChanged({ $dtpEnd.Enabled = $chkEnd.Checked })
 New-Ctl 'Label' $tAct @{ Location = (P 10 272); Size = (S 820 40); ForeColor = [System.Drawing.Color]::DimGray
     Text = "Trying it out for a month? After that night, NightGuard removes itself completely (tasks, blocks and files). Heads up: with an end date it can't be uninstalled before it, and the date can't be moved earlier." } | Out-Null
 
-$chkCheckIn = New-Ctl 'CheckBox' $tAct @{ Text = 'Morning check-in'; Location = (P 10 330); Size = (S 300 24); Font = $FontBold }
-New-Ctl 'Label' $tAct @{ Location = (P 30 356); Size = (S 860 60); ForeColor = [System.Drawing.Color]::DimGray
-    Text = "On your first sign-in each day: a little cheer for last night, your streak of clean nights (off before bedtime, no bouncer needed), and an optional mood and note for your journal. Skipping takes one click. Read it back any time under My journal (bottom left)." } | Out-Null
+# ---------------------------------------------------------------- Your why and journal
+New-Ctl 'Label' $tWhy @{ Text = 'Why are you doing this?'; Location = (P 16 12); Size = (S 880 34); Font = (New-Object System.Drawing.Font('Segoe UI', 15, [System.Drawing.FontStyle]::Bold))
+    ForeColor = [System.Drawing.Color]::FromArgb(40, 50, 120) } | Out-Null
+New-Ctl 'Label' $tWhy @{ Location = (P 16 50); Size = (S 880 64); Font = $FontRow; Text = @'
+Optional, but we HIGHLY recommend it. Write one or two sentences to future you. At 11:55 PM, mid-game, "be healthier" is easy to ignore. "I want to stop being a zombie at work" hits different. NightGuard shows it in the final warning, the bedtime countdown and your morning check-in.
+'@ } | Out-Null
+$txtWhy = New-Ctl 'TextBox' $tWhy @{ Location = (P 16 122); Size = (S 880 70); Multiline = $true; MaxLength = 300; Font = (New-Object System.Drawing.Font('Segoe UI', 12)) }
+$lblWhyCount = New-Ctl 'Label' $tWhy @{ Location = (P 16 196); Size = (S 880 20); ForeColor = $Gray }
+New-Ctl 'Label' $tWhy @{ Location = (P 16 222); Size = (S 880 86); ForeColor = $Gray; Text = @'
+Need ideas?   "I want to wake up without hating my alarm."   "My grades are worth more than my rank."
+"I promised my kids I'd have energy on weekends."   "I'm tired of being tired."   "3 AM me makes bad decisions."
+'@ } | Out-Null
+$txtWhy.Add_TextChanged({ $lblWhyCount.Text = "$($txtWhy.Text.Length) / 300" + $(if (-not $txtWhy.Text.Trim()) { '   (empty: no reminder will be shown)' } else { '' }) })
+
+$chkCheckIn = New-Ctl 'CheckBox' $tWhy @{ Text = 'Morning check-in, streaks and badges (recommended)'; Location = (P 16 330); Size = (S 600 26); Font = $FontRowB }
+New-Ctl 'Label' $tWhy @{ Location = (P 36 360); Size = (S 860 110); ForeColor = [System.Drawing.Color]::DimGray; Font = $FontRow
+    Text = "On your first sign-in each day: a little cheer for last night and your streak of clean nights (off before bedtime, no bouncer needed). Earn badges from night 1 all the way to a full year. Log an optional mood and note for your private journal, or skip with one click. Read it back any time under My journal (bottom left)." } | Out-Null
 
 # ---------------------------------------------------------------- Blocking tab
 $chkBlock = New-Ctl 'CheckBox' $tBlock @{ Text = 'Turn on site and app blocking (goodbye, 1 AM doomscrolling)'; Location = (P 10 10); Size = (S 450 24); Font = $FontBold }
@@ -767,8 +792,16 @@ $bUsage.Add_Click({ Safe { $c = Get-NGConfig; $lblUsage.Text = $(if ($c) { Get-N
 New-Ctl 'Label' $tReview @{ Text = 'Last stop: review and install'; Location = (P 16 12); Size = (S 600 30); Font = $FontBig } | Out-Null
 New-Ctl 'Label' $tReview @{ Location = (P 16 46); Size = (S 890 24); Font = $FontRow
     Text = "Check it twice: once installed, stricter changes are instant, but looser ones and uninstalling need a 7-day cool-off." } | Out-Null
-$txtReview = New-Ctl 'TextBox' $tReview @{ Location = (P 16 78); Size = (S 895 450); Multiline = $true; ReadOnly = $true; ScrollBars = 'Vertical'
+$txtReview = New-Ctl 'TextBox' $tReview @{ Location = (P 16 78); Size = (S 895 360); Multiline = $true; ReadOnly = $true; ScrollBars = 'Vertical'
     Font = (New-Object System.Drawing.Font('Consolas', 10.5)); BackColor = [System.Drawing.Color]::White }
+New-Ctl 'Label' $tReview @{ Text = 'Shortcuts to NightGuard:'; Location = (P 16 450); Size = (S 180 24); Font = $FontRowB } | Out-Null
+$chkScStart = New-Ctl 'CheckBox' $tReview @{ Text = 'Start Menu'; Location = (P 200 448); Size = (S 130 26); Font = $FontRow; Checked = $true }
+$chkScDesk  = New-Ctl 'CheckBox' $tReview @{ Text = 'Desktop'; Location = (P 335 448); Size = (S 110 26); Font = $FontRow }
+New-Ctl 'Label' $tReview @{ Location = (P 16 478); Size = (S 895 56); ForeColor = $Gray; Text = @'
+Taskbar: Windows doesn't let apps pin themselves, so after installing, right-click NightGuard in the Start Menu > Pin to taskbar.
+NightGuard installs its own copy into C:\ProgramData\NightGuard, so you can delete the downloaded folder afterwards.
+'@ } | Out-Null
+$chkScStart.Add_CheckedChanged({ Update-Validation }); $chkScDesk.Add_CheckedChanged({ Update-Validation })
 $chkCorrect = New-Ctl 'CheckBox' $tReview @{ Text = 'Yes, these settings are correct.'; Location = (P 16 540); Size = (S 890 30); Font = $FontRowB }
 
 # Ticking the box shows the Install / Save button. With a new trusted-person code, the risk warning comes first.
@@ -805,8 +838,11 @@ function Update-Review {
     & $add 'AT BEDTIME'
     & $add ("  {0} after a {1} second countdown, repeating every {2} min through the night" -f $cfg.Action, $cfg.CountdownSeconds, $cfg.RecheckMinutes)
     & $add ("  Settings locked from {0} min before bedtime until unlock" -f $cfg.NightModeMinutes)
-    & $add ("  Morning check-in and journal: {0}" -f $(if ($cfg.MorningCheckIn) { 'on' } else { 'off' }))
     & $add ("  End date: {0}" -f $(if ($cfg.EndDate) { "last night is $($cfg.EndDate), then NightGuard removes itself" } else { 'none' }))
+    & $add ''
+    & $add 'YOUR WHY AND JOURNAL'
+    & $add $(if ($cfg.Why) { '  "' + $cfg.Why + '"' } else { '  (no reason written; we recommend one!)' })
+    & $add ("  Morning check-in, streaks and badges: {0}" -f $(if ($cfg.MorningCheckIn) { 'on' } else { 'off' }))
     & $add ''
     & $add 'GAME AND SCREEN TIME'
     $st = $cfg.ScreenTime
@@ -824,6 +860,9 @@ function Update-Review {
         if ($b.DuringBedtime) { & $add '  during bedtime hours' }
         foreach ($w in @($b.Windows)) { & $add ("  {0}: {1} to {2}" -f (@($w.Days) -join ' '), (Format-LocalTime $w.From), (Format-LocalTime $w.To)) }
     } else { & $add '  off' }
+    & $add ''
+    & $add 'SHORTCUTS'
+    & $add ('  ' + ((@($(if ($cfg.ShortcutStartMenu) { 'Start Menu' }), $(if ($cfg.ShortcutDesktop) { 'Desktop' })) | Where-Object { $_ }) -join ', '))
     & $add ''
     & $add 'TRUSTED PERSON'
     & $add $(if (Get-NGTrusted) { '  ON, saving needs the code' } elseif ($chkTrust.Checked) { '  ON: your trusted person sets the code right after you click ' + $btnSave.Text } else { '  off' })
@@ -872,6 +911,9 @@ function Load-Form($Cfg) {
     $dtpEnd.Value = $(if ($end) { $end } else { $today.AddDays(30) })
     $chkEnd.Checked = [bool]$end
     $chkCheckIn.Checked = ($Cfg.MorningCheckIn -ne $false)
+    $txtWhy.Text = [string]$Cfg.Why
+    $chkScStart.Checked = ($Cfg.ShortcutStartMenu -ne $false)
+    $chkScDesk.Checked = [bool]$Cfg.ShortcutDesktop
     $dtpEnd.Enabled = [bool]$end
     $b = $Cfg.Blocking
     $chkBlock.Checked = [bool]$b.Enabled
@@ -938,6 +980,9 @@ function Read-Form {
         NightModeMinutes = [int]$numNight.Value
         EndDate = $(if ($chkEnd.Checked) { $dtpEnd.Value.Date.ToString('yyyy-MM-dd') } else { $null })
         MorningCheckIn = $chkCheckIn.Checked
+        Why = $txtWhy.Text.Trim()
+        ShortcutStartMenu = $chkScStart.Checked
+        ShortcutDesktop = $chkScDesk.Checked
         Blocking = [pscustomobject]@{
             Enabled = $chkBlock.Checked
             DuringBedtime = $chkBlockBed.Checked
@@ -1057,7 +1102,9 @@ $btnSave.Add_Click({ Safe {
     $form.Cursor = 'WaitCursor'
     try { & (Join-Path $PSScriptRoot 'install.ps1') -ConfigPath $tmp -Code $code -NoPause -ThrowOnError | Out-Null }
     finally { $form.Cursor = 'Default'; Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
-    $done = if ($wasInstalled) { 'Saved. Your new settings are active.' } else { 'NightGuard is installed and on duty. Sweet dreams!' }
+    $done = if ($wasInstalled) { 'Saved. Your new settings are active.' } else {
+        "NightGuard is installed and on duty. Sweet dreams!`n`nIt runs from its own copy in $NGDir, so you can delete the downloaded folder now. Open NightGuard again from the " +
+        $(if ($cfg.ShortcutStartMenu -ne $false) { 'Start Menu' } else { 'Desktop' }) + ' shortcut.' }
     if ($wantTrust) {
         $newCode = Read-NewCode $trustName
         if ($newCode) {
