@@ -558,7 +558,7 @@ public partial class MainWindow : Window
     private void PreviewCountdown_Click(object sender, RoutedEventArgs e)
     {
         var cfg = ReadForm();
-        new CountdownWindow(10, Defaults.ActionWord(cfg.Action), cfg.Why, preview: true) { Owner = this }.Show();
+        new CountdownWindow(20, Defaults.ActionWord(cfg.Action), cfg.Why, preview: true).Show();
     }
 
     // ================================================================ screen time and blocking pages

@@ -147,7 +147,7 @@ internal sealed class Agent : IDisposable
                 break;
             case AgentEventKinds.Countdown:
                 Balloon("NightGuard: bedtime", $"This PC will {ev.ActionWord} in {ev.Seconds} seconds. Save now.");
-                _countdown?.Close();
+                _countdown?.ForceClose();
                 _countdown = new CountdownWindow(ev.Seconds, ev.ActionWord, ev.Why, preview: false);
                 _countdown.Closed += (_, _) => _countdown = null;
                 _countdown.Show();
