@@ -1,0 +1,16 @@
+# Local test files
+*.log
+log.txt
+config.json
+trusted.json
+state.json
+hosts.backup
+firewall.sig
+*.zip
+
+# Editors and OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
