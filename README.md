@@ -19,6 +19,7 @@ NightGuard warns you before bedtime, then **powers your PC off** (hibernate by d
 - 🚫 **Blocks distractions on a schedule** (optional). Social media sites and apps like Discord or Steam, during bedtime or during your focus hours.
 - 🔐 **Trusted-person mode** (optional). A friend or parent types in their own secret 8-digit code. Without it, you can't change settings or uninstall. No more "I'll just disable it tonight".
 - 🌘 **Night mode.** In the last hour before bedtime, settings are locked. Past-you made a decision. Present-you doesn't get a vote.
+- ☀️ **Morning check-in.** A little cheer for last night, your streak of clean nights, and an optional mood + note for your private journal. Recovery is a streak game.
 - 🏁 **End date** (optional). Do a 30-day challenge and NightGuard removes itself afterwards.
 
 ---
@@ -42,6 +43,7 @@ Needs Windows 10 or 11. Nothing else to install: it uses the PowerShell that's a
 - **At bedtime:** a 60-second countdown, then the PC hibernates. Your open stuff is saved to disk, usually.
 - **Switch it back on before unlock time?** About a minute later: countdown, hibernate. Repeat until you give up and sleep. 😴
 - **After unlock time:** your PC is back to normal, and your apps are where you left them.
+- **Your first sign-in of the day:** a morning check-in pops up to congratulate you (or gently roast you), shows your streak, and lets you log your mood. Or just click **Skip**.
 
 ### 🧪 Not sure yet? Test drive it first
 
@@ -86,7 +88,7 @@ Times are shown the same way as your Windows clock: 12-hour with AM/PM, or 24-ho
 |---|---|---|
 | **Bedtimes** | Bedtime and unlock time for each night. Untick nights to leave them free. Use the **Set several nights at once** box to give every night, school nights or weekend nights the same times in one click. Each row shows which hours get locked. | Every night, 00:00 to 06:00 |
 | **Warnings** | Up to 6 popups: how many minutes before, the message, sound on or off. **Preview** any popup, or the bedtime countdown, right there. | 30 and 5 minutes before |
-| **At bedtime** | Hibernate, Shutdown, Sleep, Lock or Sign out. Countdown length, how often it repeats, night mode length, end date. | Hibernate, 60 s countdown, repeats every minute |
+| **At bedtime** | Hibernate, Shutdown, Sleep, Lock or Sign out. Countdown length, how often it repeats, night mode length, end date, morning check-in on or off. | Hibernate, 60 s countdown, repeats every minute, check-in on |
 | **Game and screen time** | Daily game and screen time budgets (weekdays and weekends), warnings, what happens when time runs out, which programs count as games | Off (1 h games / 4 h screen on weekdays, 2 h / 6 h at weekends when you turn it on) |
 | **Block sites and apps** | Websites, apps or whole folders to block, and when | Off (a social media list is ready to go) |
 | **Trusted person** | Turn on the code lock. Your trusted person types their own code when you install or save. | Off |
@@ -120,6 +122,18 @@ Click **Fill in example messages** on the Warnings step to start from these, and
 - **Hibernate has to be switched on in Windows.** It's off on many desktop PCs. When you install with Hibernate picked, NightGuard checks and, **if you say yes**, turns it on for you (`powercfg /hibernate on`). Windows then sets aside some disk space for it (a file about half the size of your RAM). If you say no, or your PC can't hibernate, NightGuard **shuts down instead**. Uninstalling NightGuard leaves the Windows hibernate setting as it is.
 
 ---
+
+## ☀️ Morning check-in and journal
+
+Quitting late nights works like quitting anything: small wins, counted. So on your **first sign-in each day**, NightGuard pops up with:
+
+- **A verdict on last night.** Off before bedtime? Applause. NightGuard had to step in? A gentle roast and a fresh start. Free night? Hope it was fun.
+- **Your streak:** clean nights in a row. A *clean night* means you were off before bedtime and stayed off, so the bouncer never had to step in. Free nights don't break the streak.
+- **An optional mood (1 to 5) and a short note**, saved to your journal. Or click **Skip**. No guilt trips. Well, small ones.
+
+Read it all back under **My journal** (bottom left in the app): your entries, your streak and your average mood lately. **Save a copy...** exports it to a text file.
+
+Privacy: the journal stays on this PC, in a folder that only your Windows account (and the PC's administrators) can read. Nothing leaves the computer. It's deleted when NightGuard is uninstalled, so save a copy first if you want to keep it. Don't want the check-in? Untick **Morning check-in** on the At bedtime step (no cool-off needed for that one).
 
 ## 🎮 Screen time limits
 
@@ -196,7 +210,7 @@ Things that still work without the code, so you're never truly stuck:
 
 NightGuard was built to be strict at night and harmless otherwise:
 
-- It only creates **its own scheduled tasks** (all in a `NightGuard` folder in Task Scheduler), **its own firewall rules** (group `NightGuard`), **one marked section in the hosts file**, its folder in `C:\ProgramData\NightGuard`, and Start Menu shortcuts. Nothing touches boot settings, drivers, accounts, or your network setup.
+- It only creates **its own scheduled tasks** (all in a `NightGuard` folder in Task Scheduler), **its own firewall rules** (group `NightGuard`), **one marked section in the hosts file**, its folder in `C:\ProgramData\NightGuard` (settings, log and journal live there), and Start Menu shortcuts. The only Windows setting it may change is turning hibernate on, and only if you say yes. Nothing touches boot settings, drivers, accounts, or your network setup.
 - Settings that could cause a shutdown loop are refused: a night can be at most 16 hours, and there must be at least 6 free hours between nights.
 - There's always a countdown of at least 15 seconds before anything happens.
 - **Damaged settings or a wrong clock?** NightGuard does nothing rather than risk a shutdown loop. If the settings file can't be read, or the clock is earlier than when the settings were saved (for example after a BIOS reset), it stands down and writes why in the log.
@@ -243,6 +257,7 @@ Something weird? [Open an issue](../../issues). Bug reports from fellow procrast
 | `blocker.ps1` | Turns site and app blocking on and off |
 | `tracker.ps1` | Counts game and screen time every minute |
 | `notify.ps1` | Screen time popups |
+| `checkin.ps1` | The morning check-in popup and journal |
 | `common.ps1` | Shared code. The top of the file documents every setting. |
 
 Settings are saved in `C:\ProgramData\NightGuard\config.json`, and there's a log in `log.txt` next to it.
@@ -260,7 +275,7 @@ Request an unlock (or uninstall) in the app and wait out the 7-day cool-off. If 
 That's exactly the kind of thing NightGuard is here to stop. During the day you can make it stricter anytime; looser takes the 7-day cool-off.
 
 **Does it spy on me or phone home?**
-No. No internet, no accounts, no tracking. It's a few PowerShell scripts you can read.
+No. No internet, no accounts, no tracking. Your mood journal never leaves the PC. It's a few PowerShell scripts you can read.
 
 **I work night shifts.**
 Set your own bedtime and unlock time per night. Any time works, as long as there are at least 6 free hours between nights.

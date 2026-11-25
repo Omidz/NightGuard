@@ -216,6 +216,7 @@ $lstSteps.Add_SelectedIndexChanged({ if ($lstSteps.SelectedIndex -ge 0 -and $tab
 
 # Bottom-left extras: status and log, uninstall, discard. Kept out of the wizard pages.
 $SideBtn = @{ FlatStyle = 'Flat'; ForeColor = [System.Drawing.Color]::White; BackColor = [System.Drawing.Color]::FromArgb(45, 50, 75) }
+$bJournal   = New-Ctl 'Button' $pnlSteps ($SideBtn + @{ Text = 'My journal'; Location = (P 18 496); Size = (S 170 34) })
 $bStatus    = New-Ctl 'Button' $pnlSteps ($SideBtn + @{ Text = 'Status and log'; Location = (P 18 540); Size = (S 170 34) })
 $bUninst    = New-Ctl 'Button' $pnlSteps ($SideBtn + @{ Text = 'Uninstall...'; Location = (P 18 584); Size = (S 170 34) })
 $btnDiscard = New-Ctl 'Button' $pnlSteps ($SideBtn + @{ Text = 'Discard changes'; Location = (P 18 628); Size = (S 170 34) })
@@ -270,7 +271,7 @@ We'll walk through a few short steps together:
 
    1.  Bedtimes: when your nights start and end.
    2.  Warnings: friendly (then less friendly) popups before bedtime.
-   3.  At bedtime: what your PC does when time is up.
+   3.  At bedtime: what your PC does when time is up, plus a morning cheer.
    4.  Game and screen time: daily budgets, if you want them.
    5.  Block sites and apps: goodbye, 1 AM doomscrolling (optional).
    6.  Trusted person: hand the off switch to someone else (optional).
@@ -302,6 +303,7 @@ function Update-Welcome {
     }
     $btnSave.Text = if ($installed) { 'Save and apply' } else { 'Install NightGuard' }
     $bStatus.Enabled = $installed
+    $bJournal.Enabled = $installed
     $bUninst.Enabled = $installed
     $bUninst.Text = if (-not $installed -or (Get-NGTrusted)) { 'Uninstall...' } else {
         switch ((Get-NGUnlock).State) { 'Open' { 'Uninstall...' } 'Waiting' { 'Cool-off running...' } default { 'Request uninstall...' } } }
@@ -349,6 +351,46 @@ function Get-StatusText {
         Get-Content $log -Tail 15 | ForEach-Object { & $add "  $_" }
     }
     return $sb.ToString()
+}
+
+# ---------------------------------------------------------------- My journal (bottom-left button)
+function Show-JournalDialog {
+    $entries = @(Get-NGJournal | Sort-Object { "$($_.Date) $($_.Time)" } -Descending)
+    $d = New-Ctl 'Form' $null @{ Text = 'NightGuard - my journal'; Size = (S 880 600); StartPosition = 'CenterParent'
+        FormBorderStyle = 'FixedDialog'; MaximizeBox = $false; MinimizeBox = $false; Font = $FontUI }
+    $cfg = Get-NGConfig
+    $rep = $null; if ($cfg) { try { $rep = Get-NGNightReport $cfg } catch { } }
+    $moods = @($entries | Select-Object -First 7 | Where-Object { [int]$_.Mood -gt 0 } | ForEach-Object { [int]$_.Mood })
+    $avg = if ($moods.Count) { 'average mood lately: {0:0.0} out of 5' -f ($moods | Measure-Object -Average).Average } else { 'no moods logged yet' }
+    $streak = if ($rep) { "Current streak: $($rep.Streak) clean night(s)" } else { 'Streak: shown in the morning' }
+    New-Ctl 'Label' $d @{ Text = "$streak   |   $($entries.Count) entries   |   $avg"; Location = (P 12 12); Size = (S 840 24); Font = $FontRowB } | Out-Null
+    $lv = New-Ctl 'ListView' $d @{ Location = (P 12 44); Size = (S 840 460); View = 'Details'; FullRowSelect = $true; GridLines = $true; Font = $FontRow }
+    foreach ($c in @(@('Date', 120), @('Mood', 80), @('Last night', 120), @('Streak', 70), @('Note', 440))) { [void]$lv.Columns.Add($c[0], $c[1]) }
+    $nightWords = @{ Clean = 'clean'; SteppedIn = 'bouncer stepped in'; Free = 'free night' }
+    foreach ($e in $entries) {
+        $it = New-Object System.Windows.Forms.ListViewItem ([string]$e.Date)
+        [void]$it.SubItems.Add($(if ([int]$e.Mood -gt 0) { "$($e.Mood) $($NGMoodNames[[int]$e.Mood])" } else { '' }))
+        [void]$it.SubItems.Add([string]$nightWords[[string]$e.LastNight])
+        [void]$it.SubItems.Add([string]$e.Streak)
+        [void]$it.SubItems.Add([string]$e.Note)
+        [void]$lv.Items.Add($it)
+    }
+    if ($entries.Count -eq 0) { New-Ctl 'Label' $d @{ Text = 'Nothing here yet. Your morning check-ins will show up here.'; Location = (P 30 120); Size = (S 600 24); BackColor = [System.Drawing.Color]::White } | Out-Null; $lv.SendToBack() }
+    $bExp = New-Ctl 'Button' $d @{ Text = 'Save a copy...'; Location = (P 12 514); Size = (S 130 32); Enabled = ($entries.Count -gt 0) }
+    $bC = New-Ctl 'Button' $d @{ Text = 'Close'; Location = (P 752 514); Size = (S 100 32); DialogResult = 'Cancel' }
+    New-Ctl 'Label' $d @{ Text = 'Your journal is deleted when NightGuard is uninstalled, so save a copy if you want to keep it.'; Location = (P 152 520); Size = (S 590 22); ForeColor = $Gray } | Out-Null
+    $d.CancelButton = $bC
+    $bExp.Add_Click({ Safe {
+        $dlg = New-Object System.Windows.Forms.SaveFileDialog
+        $dlg.Filter = 'Text file (*.txt)|*.txt'; $dlg.FileName = "NightGuard journal $(Get-Date -Format 'yyyy-MM-dd').txt"
+        if ($dlg.ShowDialog($d) -eq 'OK') {
+            $lines = foreach ($e in $entries) { '{0} {1}  mood: {2}  last night: {3}  streak: {4}  {5}' -f $e.Date, $e.Time, $(if ([int]$e.Mood -gt 0) { "$($e.Mood)/5" } else { '-' }), $nightWords[[string]$e.LastNight], $e.Streak, $e.Note }
+            Set-Content -Path $dlg.FileName -Value $lines -Encoding UTF8
+            Msg 'Saved.'
+        }
+    } })
+    [void]$d.ShowDialog($script:form)
+    $d.Dispose()
 }
 
 function Show-StatusDialog {
@@ -526,6 +568,10 @@ $dtpEnd = New-Ctl 'DateTimePicker' $tAct @{ Location = (P 320 240); Size = (S 16
 $chkEnd.Add_CheckedChanged({ $dtpEnd.Enabled = $chkEnd.Checked })
 New-Ctl 'Label' $tAct @{ Location = (P 10 272); Size = (S 820 40); ForeColor = [System.Drawing.Color]::DimGray
     Text = "Trying it out for a month? After that night, NightGuard removes itself completely (tasks, blocks and files). Heads up: with an end date it can't be uninstalled before it, and the date can't be moved earlier." } | Out-Null
+
+$chkCheckIn = New-Ctl 'CheckBox' $tAct @{ Text = 'Morning check-in'; Location = (P 10 330); Size = (S 300 24); Font = $FontBold }
+New-Ctl 'Label' $tAct @{ Location = (P 30 356); Size = (S 860 60); ForeColor = [System.Drawing.Color]::DimGray
+    Text = "On your first sign-in each day: a little cheer for last night, your streak of clean nights (off before bedtime, no bouncer needed), and an optional mood and note for your journal. Skipping takes one click. Read it back any time under My journal (bottom left)." } | Out-Null
 
 # ---------------------------------------------------------------- Blocking tab
 $chkBlock = New-Ctl 'CheckBox' $tBlock @{ Text = 'Turn on site and app blocking (goodbye, 1 AM doomscrolling)'; Location = (P 10 10); Size = (S 450 24); Font = $FontBold }
@@ -759,6 +805,7 @@ function Update-Review {
     & $add 'AT BEDTIME'
     & $add ("  {0} after a {1} second countdown, repeating every {2} min through the night" -f $cfg.Action, $cfg.CountdownSeconds, $cfg.RecheckMinutes)
     & $add ("  Settings locked from {0} min before bedtime until unlock" -f $cfg.NightModeMinutes)
+    & $add ("  Morning check-in and journal: {0}" -f $(if ($cfg.MorningCheckIn) { 'on' } else { 'off' }))
     & $add ("  End date: {0}" -f $(if ($cfg.EndDate) { "last night is $($cfg.EndDate), then NightGuard removes itself" } else { 'none' }))
     & $add ''
     & $add 'GAME AND SCREEN TIME'
@@ -824,6 +871,7 @@ function Load-Form($Cfg) {
     $dtpEnd.MinDate = $(if ($end -and $end -lt $today) { $end } else { $today })
     $dtpEnd.Value = $(if ($end) { $end } else { $today.AddDays(30) })
     $chkEnd.Checked = [bool]$end
+    $chkCheckIn.Checked = ($Cfg.MorningCheckIn -ne $false)
     $dtpEnd.Enabled = [bool]$end
     $b = $Cfg.Blocking
     $chkBlock.Checked = [bool]$b.Enabled
@@ -889,6 +937,7 @@ function Read-Form {
         RecheckMinutes = [int]$numRecheck.Value
         NightModeMinutes = [int]$numNight.Value
         EndDate = $(if ($chkEnd.Checked) { $dtpEnd.Value.Date.ToString('yyyy-MM-dd') } else { $null })
+        MorningCheckIn = $chkCheckIn.Checked
         Blocking = [pscustomobject]@{
             Enabled = $chkBlock.Checked
             DuringBedtime = $chkBlockBed.Checked
@@ -1026,6 +1075,7 @@ $btnSave.Add_Click({ Safe {
 
 $btnDiscard.Add_Click({ Safe { Reload-Form } })
 $bStatus.Add_Click({ Safe { Show-StatusDialog } })
+$bJournal.Add_Click({ Safe { Show-JournalDialog } })
 
 function Invoke-Preview([string]$Script, [string[]]$ScriptArgs, $Cfg = $null) {
     if (-not $Cfg) { $Cfg = Read-Form }

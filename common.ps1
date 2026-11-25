@@ -11,6 +11,7 @@
 #   RecheckMinutes    How often the action repeats during the night (1-60)
 #   NightModeMinutes  Settings/uninstall are blocked from this many minutes before bedtime until unlock (0-240)
 #   EndDate           yyyy-MM-dd: last night that is locked. The lock removes itself after it. null = never.
+#   MorningCheckIn    true/false: a cheerful popup on the first sign-in each day, with an optional mood + note journal
 #   Blocking          { Enabled, DuringBedtime, Sites[], Apps[], Windows[ {Days[], From, To} ] }
 #                     Sites are blocked in the hosts file, Apps (exe files or folders) with Windows Firewall.
 #   ScreenTime        Daily game and screen time budgets:
@@ -44,7 +45,7 @@ $NGHosts     = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
 $NGHostsBegin = "# >>> $NGAppName BEGIN - managed by $NGAppName, removed automatically"
 $NGHostsEnd   = "# <<< $NGAppName END"
 $NGFwGroup   = $NGAppName
-$NGScripts   = @('common.ps1', 'enforce.ps1', 'session.ps1', 'warn.ps1', 'blocker.ps1', 'tracker.ps1', 'notify.ps1', 'install.ps1', 'uninstall.ps1', 'menu.ps1', 'gui.ps1', "$NGAppName.cmd", 'TextMenu.cmd')
+$NGScripts   = @('common.ps1', 'enforce.ps1', 'session.ps1', 'warn.ps1', 'blocker.ps1', 'tracker.ps1', 'notify.ps1', 'checkin.ps1', 'install.ps1', 'uninstall.ps1', 'menu.ps1', 'gui.ps1', "$NGAppName.cmd", 'TextMenu.cmd')
 # Earlier name of this tool; old installs are migrated and removed on install
 $NGLegacyName = 'BedtimeLock'
 $NGLegacyDir  = Join-Path $env:ProgramData $NGLegacyName
@@ -149,6 +150,7 @@ function New-NGDefaultConfig {
         RecheckMinutes   = 1
         NightModeMinutes = 60
         EndDate          = $null
+        MorningCheckIn   = $true
         Blocking         = New-NGDefaultBlocking
         ScreenTime       = New-NGDefaultScreenTime
     }
@@ -187,6 +189,7 @@ function ConvertTo-NGJson($Cfg) {
         RecheckMinutes   = [int]$Cfg.RecheckMinutes
         NightModeMinutes = [int]$Cfg.NightModeMinutes
         EndDate          = $(if ($Cfg.EndDate) { [string]$Cfg.EndDate } else { $null })
+        MorningCheckIn   = $(if ($null -eq $Cfg.MorningCheckIn) { $true } else { [bool]$Cfg.MorningCheckIn })
         Blocking         = [ordered]@{
             Enabled       = [bool]$b.Enabled
             DuringBedtime = [bool]$b.DuringBedtime
@@ -912,6 +915,75 @@ function Get-NGUninstallBlock($Cfg) {
 # ============================================================================
 # Removal. Only removes what NightGuard created.
 # ============================================================================
+# ============================================================================
+# Morning check-in, streaks and journal
+#  - enforce.ps1 notes each night NightGuard had to step in (stepped-in.txt).
+#  - A "clean night" is a guarded night where it didn't have to: you were off
+#    before bedtime and stayed off. The streak counts clean nights in a row.
+#  - Each user's journal lives in journal\<their SID>\, readable only by that
+#    user, SYSTEM and administrators.
+# ============================================================================
+$NGJournalDir    = Join-Path $NGDir 'journal'
+$NGSteppedInFile = Join-Path $NGDir 'stepped-in.txt'
+$NGSinceFile     = Join-Path $NGDir 'since.txt'
+
+function Add-NGSteppedIn([datetime]$Evening) {
+    try {
+        $key = $Evening.ToString('yyyy-MM-dd')
+        $have = @(); if (Test-Path $NGSteppedInFile) { $have = @(Get-Content $NGSteppedInFile) }
+        if ($have -contains $key) { return }
+        @($have + $key) | Select-Object -Last 400 | Set-Content -Path $NGSteppedInFile -Encoding ASCII
+    } catch { }
+}
+
+function Get-NGSince {
+    try { return [datetime]::ParseExact((Get-Content $NGSinceFile -TotalCount 1).Trim(), 'yyyy-MM-dd', $NGInv) } catch { return (Get-Date).Date }
+}
+
+# How did last night go? Returns $null while a locked night is still running, else
+# an object with Kind = Clean | SteppedIn | Free | New, and the current streak.
+function Get-NGNightReport($Cfg, [datetime]$Now = (Get-Date)) {
+    if (Get-NGCurrentNight $Cfg) { return $null }
+    $since = Get-NGSince
+    $stepped = @(); if (Test-Path $NGSteppedInFile) { $stepped = @(Get-Content $NGSteppedInFile) }
+    $streak = 0
+    for ($i = 1; $i -le 400; $i++) {
+        $eve = $Now.Date.AddDays(-$i)
+        if ($eve -lt $since) { break }
+        $n = Get-NGNight $Cfg $eve -IgnoreEndDate
+        if (-not $n -or $n.End -gt $Now) { continue }       # free night (doesn't break the streak)
+        if ($stepped -contains $eve.ToString('yyyy-MM-dd')) { break }
+        $streak++
+    }
+    $y = $Now.Date.AddDays(-1)
+    $last = Get-NGNight $Cfg $y -IgnoreEndDate
+    $kind = if ($y -lt $since) { 'New' } elseif (-not $last) { 'Free' } elseif ($stepped -contains $y.ToString('yyyy-MM-dd')) { 'SteppedIn' } else { 'Clean' }
+    return [pscustomobject]@{ Kind = $kind; Streak = $streak }
+}
+
+function Get-NGJournalFolder([switch]$Create) {
+    $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    $dir = Join-Path $NGJournalDir $sid
+    if ($Create -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    return $dir
+}
+
+function Get-NGJournal {
+    $f = Join-Path (Get-NGJournalFolder) 'journal.json'
+    if (-not (Test-Path $f)) { return @() }
+    try { $raw = Get-Content $f -Raw -Encoding UTF8 | ConvertFrom-Json; return @($raw | ForEach-Object { $_ }) } catch { return @() }
+}
+
+function Add-NGJournalEntry($Entry) {
+    $f = Join-Path (Get-NGJournalFolder -Create) 'journal.json'
+    $list = New-Object System.Collections.ArrayList
+    foreach ($e in (Get-NGJournal)) { [void]$list.Add($e) }
+    [void]$list.Add($Entry)
+    ConvertTo-Json -InputObject @($list | Select-Object -Last 1000) -Depth 4 | Set-Content -Path $f -Encoding UTF8
+}
+
+$NGMoodNames = @{ 1 = 'Rough'; 2 = 'Meh'; 3 = 'OK'; 4 = 'Good'; 5 = 'Great' }
+
 function Remove-NightGuard {
     try { [void](Clear-NGBlocks) } catch { }
     Get-ScheduledTask -TaskPath $NGTaskPath -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false

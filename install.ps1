@@ -91,6 +91,12 @@ try {
     & icacls.exe $NGDir /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "icacls failed with exit code $LASTEXITCODE" }
 
+    # Morning check-in journal: each user gets a private subfolder (only they, SYSTEM and admins can read it)
+    if (-not (Test-Path $NGSinceFile)) { Set-Content -Path $NGSinceFile -Value (Get-Date).ToString('yyyy-MM-dd') -Encoding ASCII }
+    New-Item -ItemType Directory -Force -Path $NGJournalDir | Out-Null
+    & icacls.exe $NGJournalDir /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' '*S-1-3-0:(OI)(CI)(IO)F' '*S-1-5-32-545:(RD,AD,X,RA)' | Out-Null
+    if ($LASTEXITCODE -ne 0) { Write-NGLog "journal folder permissions could not be set (icacls exit $LASTEXITCODE)" }
+
     # Remove any older install of the tasks
     Get-ScheduledTask -TaskPath $NGTaskPath -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
 
@@ -178,6 +184,20 @@ try {
             -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
                         -MultipleInstances Parallel -ExecutionTimeLimit (New-TimeSpan -Minutes 5)) `
             -Description 'Shows screen time popups. Installed by NightGuard.' | Out-Null
+    }
+
+    # --- Task 7: Morning check-in (each signed-in user), at sign-in and unlock
+    if ($cfg.MorningCheckIn) {
+        $checkTriggers = @($logon)
+        try {
+            $cls = Get-CimClass -ClassName MSFT_TaskSessionStateChangeTrigger -Namespace 'Root/Microsoft/Windows/TaskScheduler'
+            $checkTriggers += New-CimInstance -CimClass $cls -ClientOnly -Property @{ StateChange = 8 }   # 8 = session unlock
+        } catch { }
+        Register-ScheduledTask -TaskPath $NGTaskPath -TaskName 'Morning check-in' `
+            -Action (New-NGAction 'checkin.ps1') -Trigger $checkTriggers -Principal $users `
+            -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+                        -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 15)) `
+            -Description 'Shows a morning pat on the back and an optional mood journal. Installed by NightGuard.' | Out-Null
     }
 
     # Old Screen Limits add-on: keep today's usage, then remove it
