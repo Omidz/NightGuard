@@ -144,9 +144,9 @@ function New-NGDefaultConfig {
             [pscustomobject]@{ MinutesBefore = 30; Sound = $true; Message = 'Bedtime in {minutes} minutes.\n\nThe PC will {action} at {bedtime} and stays locked until {unlock}.\n\nFinish your match, save your work, and start winding down.' },
             [pscustomobject]@{ MinutesBefore = 5;  Sound = $true; Message = 'FINAL WARNING\n\nThe PC will {action} at {bedtime} (about {minutes} min).\n\nSave your work and quit your game NOW.' }
         )
-        Action           = 'Shutdown'
+        Action           = 'Hibernate'
         CountdownSeconds = 60
-        RecheckMinutes   = 5
+        RecheckMinutes   = 1
         NightModeMinutes = 60
         EndDate          = $null
         Blocking         = New-NGDefaultBlocking
@@ -677,19 +677,26 @@ function Protect-NGFile([string]$Path) {
     & icacls.exe $Path /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F' | Out-Null
 }
 
-function New-NGCode {
-    $rng = New-Object Security.Cryptography.RNGCryptoServiceProvider
-    $digits = ''
-    $buf = New-Object byte[] 1
-    while ($digits.Length -lt 8) {
-        $rng.GetBytes($buf)
-        if ($buf[0] -lt 250) { $digits += [string]($buf[0] % 10) }   # no bias
+# The trusted person picks their own 8-digit code. Returns why a code is too weak/wrong, or $null if it's fine.
+function Get-NGCodeProblem([string]$Code) {
+    if ($Code -notmatch '^\d{8}$') { return 'The code must be exactly 8 digits.' }
+    if ($Code -match '^(\d)\1{7}$') { return 'All the same digit is too easy to guess.' }
+    $d = $Code.ToCharArray() | ForEach-Object { [int][string]$_ }
+    $up = $true; $down = $true
+    for ($i = 1; $i -lt 8; $i++) {
+        if ($d[$i] -ne ($d[$i - 1] + 1) % 10) { $up = $false }
+        if ($d[$i] -ne ($d[$i - 1] + 9) % 10) { $down = $false }
     }
-    $rng.Dispose()
-    return $digits
+    if ($up -or $down) { return 'Counting up or down (like 12345678) is too easy to guess.' }
+    if ($Code -match '^(\d\d)\1{3}$' -or $Code -match '^(\d{4})\1$') { return 'A repeating pattern (like 12121212) is too easy to guess.' }
+    if ($Code -match '^(\d)\1(\d)\2(\d)\3(\d)\4$') { return 'A doubled pattern (like 11223344) is too easy to guess.' }
+    if (($Code.ToCharArray() | Select-Object -Unique).Count -le 2) { return 'Use at least 3 different digits.' }
+    if ($Code -match '^(19|20)\d\d(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$' -or $Code -match '^(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])(19|20)\d\d$' -or $Code -match '^(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(19|20)\d\d$') {
+        return 'That looks like a date (a birthday is easy to guess). Pick something else.'
+    }
+    return $null
 }
 
-function Format-NGCode([string]$Code) { return ($Code.Substring(0, 4) + ' ' + $Code.Substring(4, 4)) }
 
 function Get-NGCodeHash([string]$Code, [byte[]]$Salt, [int]$Iterations, [string]$Alg) {
     $norm = ($Code -replace '\D', '')

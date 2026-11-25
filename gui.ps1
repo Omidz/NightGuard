@@ -85,15 +85,17 @@ function Show-CodeWarning {
     New-Ctl 'Label' $hdr @{ Text = 'WARNING: THERE IS NO WAY TO RECOVER A LOST CODE'; Location = (P 16 22); Size = (S 520 30)
         ForeColor = [System.Drawing.Color]::White; Font = $FontBig } | Out-Null
     New-Ctl 'Label' $d @{ Location = (P 16 84); Size = (S 520 210); Font = (New-Object System.Drawing.Font('Segoe UI', 10)); Text = @'
-Trusted-person mode creates an 8-digit code. After you turn it on:
+With trusted-person mode, someone you trust sets a secret 8-digit code.
+After that:
 
   - Changing ANY setting or uninstalling NightGuard needs the code.
-  - The code is shown ONCE. This PC only keeps a scrambled copy.
-  - If the code is lost, NOBODY can recover it. Not you, not the
-    trusted person, not the makers of this tool.
+  - Only the trusted person knows it. They type it in themselves,
+    and this PC only keeps a scrambled copy.
+  - If the code is forgotten, NOBODY can recover it. Not you, not
+    the trusted person, not the makers of this tool.
 
-Give the code to someone you trust (email, print or write it down)
-BEFORE you continue. You GOT TO HAVE THE CODE.
+Have your trusted person next to you when you save. They'll type
+the code twice. They GOT TO REMEMBER THE CODE (or store it safely).
 '@ } | Out-Null
     $chk = New-Ctl 'CheckBox' $d @{ Text = 'I understand: if the code is lost, it can never be recovered.'; Location = (P 16 300); Size = (S 520 24); Font = $FontBold }
     $ok = New-Ctl 'Button' $d @{ Text = 'Continue'; Location = (P 330 340); Size = (S 100 32); Enabled = $false; DialogResult = 'OK' }
@@ -105,54 +107,48 @@ BEFORE you continue. You GOT TO HAVE THE CODE.
     return ($r -eq 'OK')
 }
 
-function Send-CodeEmail([string]$Code, [string]$To) {
-    $subject = 'NightGuard code - please keep this safe'
-    $body = "Hi,`r`n`r`nI'm using NightGuard to stop myself staying up late on my PC. You are my trusted person.`r`n`r`n" +
-            "Please keep this code safe, and only give it to me if you agree I really need to change the settings or remove it:`r`n`r`n" +
-            "    $(Format-NGCode $Code)`r`n`r`n" +
-            "IMPORTANT: if this code is lost, there is no way to recover it.`r`n`r`nThanks!"
-    $uri = 'mailto:' + [uri]::EscapeDataString($To) + '?subject=' + [uri]::EscapeDataString($subject) + '&body=' + [uri]::EscapeDataString($body)
-    try { Start-Process $uri }
-    catch { Msg "No email app is set up on this PC. Use Copy and paste the code into an email yourself, or use Print." 'Warning' }
-}
-
-function Print-Code([string]$Code, [string]$To) {
-    $f = Join-Path $env:TEMP ('nightguard-code-' + [guid]::NewGuid().ToString('N') + '.txt')
-    $text = "BEDTIME LOCK - TRUSTED PERSON CODE`r`n`r`n        $(Format-NGCode $Code)`r`n`r`n" +
-            "Created: $(Get-Date -Format 'yyyy-MM-dd HH:mm')`r`n" + $(if ($To) { "Trusted person: $To`r`n" } else { '' }) +
-            "`r`nThis code is needed to change settings or uninstall NightGuard.`r`nIF THIS CODE IS LOST, IT CAN NEVER BE RECOVERED. Keep it safe.`r`n"
-    Set-Content -Path $f -Value $text -Encoding UTF8
-    try { Start-Process notepad.exe -ArgumentList @('/p', "`"$f`"") -Wait }
-    finally { Remove-Item $f -Force -ErrorAction SilentlyContinue }
-}
-
-# Shows a new code; returns $true only once the user typed it back and confirmed.
-function Show-NewCode([string]$Code, [string]$To) {
-    $d = New-Ctl 'Form' $null @{ Text = 'NightGuard - your trusted-person code'; Size = (S 560 500); StartPosition = 'CenterParent'
+# The trusted person sets the code: they type their own 8 digits twice, hidden.
+# Nobody else ever sees it, and NightGuard never shows, emails or prints it.
+# Returns the new code, or $null if cancelled.
+function Read-NewCode([string]$Name) {
+    $who = if ($Name) { $Name } else { 'the trusted person' }
+    $d = New-Ctl 'Form' $null @{ Text = 'NightGuard - trusted person sets the code'; Size = (S 600 560); StartPosition = 'CenterParent'
         FormBorderStyle = 'FixedDialog'; MaximizeBox = $false; MinimizeBox = $false; Font = $FontUI; BackColor = [System.Drawing.Color]::White }
-    $hdr = New-Ctl 'Panel' $d @{ Location = (P 0 0); Size = (S 560 50); BackColor = $Red }
-    New-Ctl 'Label' $hdr @{ Text = 'This code is shown ONCE. It can never be recovered.'; Location = (P 16 14); Size = (S 520 26)
+    $hdr = New-Ctl 'Panel' $d @{ Location = (P 0 0); Size = (S 600 56); BackColor = [System.Drawing.Color]::FromArgb(40, 50, 120) }
+    New-Ctl 'Label' $hdr @{ Text = "Hand the keyboard to $who"; Location = (P 16 15); Size = (S 560 28)
         ForeColor = [System.Drawing.Color]::White; Font = $FontBig } | Out-Null
-    New-Ctl 'Label' $d @{ Text = (Format-NGCode $Code); Location = (P 16 64); Size = (S 520 70); TextAlign = 'MiddleCenter'
-        Font = (New-Object System.Drawing.Font('Consolas', 36, [System.Drawing.FontStyle]::Bold)); BorderStyle = 'FixedSingle' } | Out-Null
-    $bEmail = New-Ctl 'Button' $d @{ Text = 'Email it to them'; Location = (P 16 146); Size = (S 160 32) }
-    $bCopy  = New-Ctl 'Button' $d @{ Text = 'Copy'; Location = (P 186 146); Size = (S 100 32) }
-    $bPrint = New-Ctl 'Button' $d @{ Text = 'Print'; Location = (P 296 146); Size = (S 100 32) }
-    New-Ctl 'Label' $d @{ Location = (P 16 190); Size = (S 520 60); Text = "Send or print it now and give it to your trusted person. Don't keep the only copy yourself, or the lock is easy to undo. Don't lose it either: without it, settings and uninstall stay locked." } | Out-Null
-    New-Ctl 'Label' $d @{ Text = 'Type the code here to confirm you have it:'; Location = (P 16 256); Size = (S 400 20); Font = $FontBold } | Out-Null
-    $txt = New-Ctl 'TextBox' $d @{ Location = (P 16 278); Size = (S 200 26); Font = $FontMono; MaxLength = 12 }
-    $chk = New-Ctl 'CheckBox' $d @{ Text = 'My trusted person has the code, and I understand it can never be recovered.'; Location = (P 16 316); Size = (S 520 24) }
-    $ok = New-Ctl 'Button' $d @{ Text = 'Turn it on'; Location = (P 310 410); Size = (S 110 32); Enabled = $false; DialogResult = 'OK' }
-    New-Ctl 'Button' $d @{ Text = 'Cancel'; Location = (P 430 410); Size = (S 100 32); DialogResult = 'Cancel' } | Out-Null
-    $check = { $ok.Enabled = $chk.Checked -and (($txt.Text -replace '\D', '') -eq $Code) }
-    $txt.Add_TextChanged($check)
-    $chk.Add_CheckedChanged($check)
-    $bEmail.Add_Click({ Safe { Send-CodeEmail $Code $To } })
-    $bCopy.Add_Click({ Safe { [System.Windows.Forms.Clipboard]::SetText((Format-NGCode $Code)); Msg 'Copied. Paste it into a message to your trusted person.' } })
-    $bPrint.Add_Click({ Safe { Print-Code $Code $To } })
+    New-Ctl 'Label' $d @{ Location = (P 16 68); Size = (S 555 120); Font = $FontRow; Text = @'
+Trusted person: pick your own 8-digit code and type it twice below. Only you will know it. Nothing is shown on screen, emailed or printed.
+
+Remember it, or store it somewhere safe that only you can get to (like your password manager). Don't tell the person you're doing this for, and don't write it anywhere near this PC.
+'@ } | Out-Null
+    New-Ctl 'Label' $d @{ Text = 'Code (8 digits):'; Location = (P 16 200); Size = (S 170 22); Font = $FontRowB } | Out-Null
+    $t1 = New-Ctl 'TextBox' $d @{ Location = (P 200 197); Size = (S 160 28); Font = (New-Object System.Drawing.Font('Consolas', 13)); MaxLength = 8; UseSystemPasswordChar = $true }
+    New-Ctl 'Label' $d @{ Text = 'Type it again:'; Location = (P 16 240); Size = (S 170 22); Font = $FontRowB } | Out-Null
+    $t2 = New-Ctl 'TextBox' $d @{ Location = (P 200 237); Size = (S 160 28); Font = (New-Object System.Drawing.Font('Consolas', 13)); MaxLength = 8; UseSystemPasswordChar = $true }
+    $lblProb = New-Ctl 'Label' $d @{ Location = (P 16 278); Size = (S 555 40); ForeColor = $Red; Font = $FontRow }
+    New-Ctl 'Label' $d @{ Location = (P 16 322); Size = (S 555 60); ForeColor = $Red; Font = $FontBold
+        Text = "THERE IS NO WAY TO RECOVER A LOST CODE. If it's forgotten, settings and uninstall stay locked for good (bedtime still ends at unlock time, and the end date still removes NightGuard)." } | Out-Null
+    $chk = New-Ctl 'CheckBox' $d @{ Text = 'I am the trusted person. I will remember this code or keep it safe, and I understand it can never be recovered.'
+        Location = (P 16 388); Size = (S 555 44); Font = $FontRow }
+    $ok = New-Ctl 'Button' $d @{ Text = 'Set the code'; Location = (P 350 470); Size = (S 120 34); Enabled = $false; DialogResult = 'OK'; Font = $FontRowB }
+    New-Ctl 'Button' $d @{ Text = 'Cancel'; Location = (P 480 470); Size = (S 90 34); DialogResult = 'Cancel' } | Out-Null
+    $check = {
+        $a = $t1.Text; $b = $t2.Text
+        $prob = if ($a.Length -lt 8) { '' } elseif (Get-NGCodeProblem $a) { (Get-NGCodeProblem $a) } elseif ($b.Length -eq 8 -and $a -ne $b) { "The two codes don't match." } else { '' }
+        $lblProb.Text = $prob
+        $ok.Enabled = $chk.Checked -and $a.Length -eq 8 -and $a -eq $b -and -not (Get-NGCodeProblem $a)
+    }
+    $digitsOnly = { param($s, $e) if (-not [char]::IsDigit($e.KeyChar) -and -not [char]::IsControl($e.KeyChar)) { $e.Handled = $true } }
+    $t1.Add_KeyPress($digitsOnly); $t2.Add_KeyPress($digitsOnly)
+    $t1.Add_TextChanged($check); $t2.Add_TextChanged($check); $chk.Add_CheckedChanged($check)
+    $d.AcceptButton = $ok
     $r = $d.ShowDialog($script:form)
+    $code = $t1.Text
+    $t1.Text = ''; $t2.Text = ''
     $d.Dispose()
-    return ($r -eq 'OK')
+    if ($r -ne 'OK') { return $null }
+    return $code
 }
 
 # Asks for the code. Returns the typed code, or $null if cancelled.
@@ -201,7 +197,7 @@ $tAct    = New-Tab 'At bedtime'
 $tScreen = New-Tab 'Game and screen time'
 $tBlock  = New-Tab 'Block sites and apps'
 $tTrust  = New-Tab 'Trusted person'
-$tReview = New-Tab 'Review and save'
+$tReview = New-Tab 'Review and install'
 foreach ($t in $tabs.TabPages) { [void]$lstSteps.Items.Add($t.Text) }
 
 # Draw the step list: current step highlighted, numbered
@@ -218,28 +214,34 @@ $lstSteps.Add_DrawItem({
 })
 $lstSteps.Add_SelectedIndexChanged({ if ($lstSteps.SelectedIndex -ge 0 -and $tabs.SelectedIndex -ne $lstSteps.SelectedIndex) { $tabs.SelectedIndex = $lstSteps.SelectedIndex } })
 
-$btnBack    = New-Ctl 'Button' $form @{ Text = '< Back'; Location = (P 735 628); Size = (S 100 40); Font = $FontRow }
-$btnNext    = New-Ctl 'Button' $form @{ Text = 'Next >'; Location = (P 843 628); Size = (S 100 40); Font = $FontRowB }
-$btnSave    = New-Ctl 'Button' $form @{ Text = 'Save and apply'; Location = (P 951 628); Size = (S 195 40); Font = $FontRowB }
-$btnDiscard = New-Ctl 'Button' $pnlSteps @{ Text = 'Discard changes'; Location = (P 18 628); Size = (S 170 34); FlatStyle = 'Flat'
-    ForeColor = [System.Drawing.Color]::White; BackColor = [System.Drawing.Color]::FromArgb(45, 50, 75) }
-$DefaultHint = 'Nothing changes until you click Save. You can jump to any step on the left.'
-$lblBottom  = New-Ctl 'Label' $form @{ Location = (P 222 628); Size = (S 505 44); ForeColor = $Gray; Font = $FontRow; Text = $DefaultHint }
+# Bottom-left extras: status and log, uninstall, discard. Kept out of the wizard pages.
+$SideBtn = @{ FlatStyle = 'Flat'; ForeColor = [System.Drawing.Color]::White; BackColor = [System.Drawing.Color]::FromArgb(45, 50, 75) }
+$bStatus    = New-Ctl 'Button' $pnlSteps ($SideBtn + @{ Text = 'Status and log'; Location = (P 18 540); Size = (S 170 34) })
+$bUninst    = New-Ctl 'Button' $pnlSteps ($SideBtn + @{ Text = 'Uninstall...'; Location = (P 18 584); Size = (S 170 34) })
+$btnDiscard = New-Ctl 'Button' $pnlSteps ($SideBtn + @{ Text = 'Discard changes'; Location = (P 18 628); Size = (S 170 34) })
+
+$btnBack = New-Ctl 'Button' $form @{ Text = '< Back'; Location = (P 843 628); Size = (S 100 40); Font = $FontRow }
+$btnNext = New-Ctl 'Button' $form @{ Text = 'Next >'; Location = (P 951 628); Size = (S 195 40); Font = $FontRowB }
+$btnSave = New-Ctl 'Button' $form @{ Text = 'Install NightGuard'; Location = (P 951 628); Size = (S 195 40); Font = $FontRowB; Visible = $false
+    BackColor = [System.Drawing.Color]::FromArgb(70, 90, 200); ForeColor = [System.Drawing.Color]::White; FlatStyle = 'Flat' }
+$DefaultHint = 'Nothing is installed or changed until the last page. Jump to any step on the left.'
+$lblBottom = New-Ctl 'Label' $form @{ Location = (P 222 628); Size = (S 610 44); ForeColor = $Gray; Font = $FontRow; Text = $DefaultHint }
 
 function Update-Nav {
     $i = $tabs.SelectedIndex; $last = $tabs.TabPages.Count - 1
     $btnBack.Enabled = $i -gt 0
-    $btnNext.Enabled = $i -lt $last
-    $btnNext.Text = $(if ($i -eq $last - 1) { 'Review >' } else { 'Next >' })
+    $btnNext.Visible = $i -lt $last
+    $btnNext.Text = $(if ($i -eq 0) { "Let's go >" } elseif ($i -eq $last - 1) { 'Review >' } else { 'Next >' })
+    # Install / Save only on the last page, and only once the settings are confirmed
+    $btnSave.Visible = ($i -eq $last) -and $chkCorrect.Checked
     if ($lstSteps.SelectedIndex -ne $i) { $lstSteps.SelectedIndex = $i }
     $lstSteps.Invalidate()
-    if ($tabs.SelectedTab -eq $tReview) { Update-Review }
 }
 $btnBack.Add_Click({ if ($tabs.SelectedIndex -gt 0) { $tabs.SelectedIndex-- } })
 $btnNext.Add_Click({ if ($tabs.SelectedIndex -lt $tabs.TabPages.Count - 1) { $tabs.SelectedIndex++ } })
-$tabs.Add_SelectedIndexChanged({ Update-Nav })
+$tabs.Add_SelectedIndexChanged({ if ($tabs.SelectedTab -eq $tReview) { Update-Review }; Update-Nav })
 
-# Live check of the settings on screen; shows the first problem under the tabs
+# Live check of the settings on screen; shows the first problem at the bottom
 $script:loading = $false
 function Update-Validation {
     if ($script:loading) { return }
@@ -255,33 +257,57 @@ function Update-Validation {
     } catch { }
 }
 
-# ---------------------------------------------------------------- Status tab
-$txtStatus = New-Ctl 'TextBox' $tStatus @{ Location = (P 10 10); Size = (S 900 420); Multiline = $true; ReadOnly = $true
-    ScrollBars = 'Vertical'; Font = $FontMono; BackColor = [System.Drawing.Color]::White }
-$bRefresh  = New-Ctl 'Button' $tStatus @{ Text = 'Refresh'; Location = (P 10 445); Size = (S 100 32) }
-$bPrevWarn = New-Ctl 'Button' $tStatus @{ Text = 'Preview warning'; Location = (P 120 445); Size = (S 130 32) }
-$bPrevCd   = New-Ctl 'Button' $tStatus @{ Text = 'Preview countdown'; Location = (P 260 445); Size = (S 140 32) }
-$bLog      = New-Ctl 'Button' $tStatus @{ Text = 'Open log'; Location = (P 410 445); Size = (S 100 32) }
-$bUninst   = New-Ctl 'Button' $tStatus @{ Text = 'Uninstall'; Location = (P 810 445); Size = (S 100 32); ForeColor = $Red }
+# ---------------------------------------------------------------- Welcome page
+$FontTitle = New-Object System.Drawing.Font('Segoe UI', 20, [System.Drawing.FontStyle]::Bold)
+$FontWelcome = New-Object System.Drawing.Font('Segoe UI', 11.5)
+$lblWelcomeTitle = New-Ctl 'Label' $tStatus @{ Location = (P 24 20); Size = (S 880 46); Font = $FontTitle; ForeColor = [System.Drawing.Color]::FromArgb(40, 50, 120) }
+$lblWelcome = New-Ctl 'Label' $tStatus @{ Location = (P 26 76); Size = (S 870 500); Font = $FontWelcome }
 
+$WelcomeNew = @'
+NightGuard is your bedtime bouncer. You tell it when you want to be in bed, and it makes sure your PC agrees with you. No more "one more match" at 2 AM.
+
+We'll walk through a few short steps together:
+
+   1.  Bedtimes: when your nights start and end.
+   2.  Warnings: friendly (then less friendly) popups before bedtime.
+   3.  At bedtime: what your PC does when time is up.
+   4.  Game and screen time: daily budgets, if you want them.
+   5.  Block sites and apps: goodbye, 1 AM doomscrolling (optional).
+   6.  Trusted person: hand the off switch to someone else (optional).
+   7.  Review and install: check everything, then switch it on.
+
+The defaults are sensible, so if you're not sure about something, just click Next. Nothing gets installed until the very last page.
+
+Ready? Click "Let's go". Future you says thanks.
+'@
+
+function Update-Welcome {
+    $cfg = Get-NGConfig
+    $installed = [bool]$cfg
+    if ($installed) {
+        $lblWelcomeTitle.Text = 'Welcome back, night owl!'
+        $next = $null; try { $next = Get-NGNextNight $cfg } catch { }
+        $nextTxt = if ($next) { '{0} {1} until {2} {3}' -f $next.Start.ToString('dddd'), $next.Start.ToString($TimeFmt), $next.End.ToString('dddd'), $next.End.ToString($TimeFmt) } else { 'none scheduled' }
+        $lblWelcome.Text = "NightGuard is installed and guarding your nights.`n`nNext locked night: $nextTxt`n`n" +
+            "Want to change something? Go through the steps (or jump straight to one on the left), then save on the last page.`n`n" +
+            "Curious what it's been up to? Click Status and log at the bottom left."
+    } else {
+        $lblWelcomeTitle.Text = 'Hi there, night owl!'
+        $lblWelcome.Text = $WelcomeNew
+    }
+    $btnSave.Text = if ($installed) { 'Save and apply' } else { 'Install NightGuard' }
+    $bStatus.Enabled = $installed
+    $bUninst.Enabled = $installed
+    Update-TrustTab
+}
+
+# ---------------------------------------------------------------- Status and log (bottom-left button)
 function Get-StatusText {
     $sb = New-Object System.Text.StringBuilder
     $add = { param($l) [void]$sb.AppendLine($l) }
     $cfg = Get-NGConfig
-    if (-not $cfg) {
-        & $add 'WELCOME TO NIGHTGUARD'
-        & $add ''
-        & $add 'Your bedtime bouncer. Setup takes a minute:'
-        & $add ''
-        & $add '  1. Click Next and pick your bedtimes.'
-        & $add '  2. Go through the steps. The defaults are fine, so just click Next if unsure.'
-        & $add '  3. Check the Review step and click Install.'
-        & $add ''
-        & $add 'Optional extras along the way: game and screen time limits, blocking'
-        & $add 'distracting sites and apps, and a trusted-person code.'
-        return $sb.ToString()
-    }
-    & $add 'BEDTIME LOCK IS ACTIVE'
+    if (-not $cfg) { return 'NightGuard is not installed yet.' }
+    & $add 'NIGHTGUARD IS ACTIVE'
     & $add ''
     $cur = Get-NGCurrentNight $cfg
     if ($cur) { & $add ("Locked now      : until {0:ddd HH\:mm}" -f $cur.End) }
@@ -312,22 +338,33 @@ function Get-StatusText {
     if (Test-Path $log) {
         & $add ''
         & $add 'Recent activity:'
-        Get-Content $log -Tail 10 | ForEach-Object { & $add "  $_" }
+        Get-Content $log -Tail 15 | ForEach-Object { & $add "  $_" }
     }
     return $sb.ToString()
 }
 
-function Update-Status {
-    $txtStatus.Text = Get-StatusText
-    $installed = [bool](Get-NGConfig)
-    $btnSave.Text = if ($installed) { 'Save and apply' } else { 'Install NightGuard' }
-    $bUninst.Enabled = $installed
-    Update-TrustTab
+function Show-StatusDialog {
+    $d = New-Ctl 'Form' $null @{ Text = 'NightGuard - status and log'; Size = (S 840 600); StartPosition = 'CenterParent'
+        FormBorderStyle = 'FixedDialog'; MaximizeBox = $false; MinimizeBox = $false; Font = $FontUI }
+    $txt = New-Ctl 'TextBox' $d @{ Location = (P 12 12); Size = (S 800 490); Multiline = $true; ReadOnly = $true; ScrollBars = 'Vertical'
+        Font = $FontMono; BackColor = [System.Drawing.Color]::White }
+    $bR = New-Ctl 'Button' $d @{ Text = 'Refresh'; Location = (P 12 512); Size = (S 100 32) }
+    $bL = New-Ctl 'Button' $d @{ Text = 'Open full log'; Location = (P 122 512); Size = (S 120 32) }
+    $bC = New-Ctl 'Button' $d @{ Text = 'Close'; Location = (P 712 512); Size = (S 100 32); DialogResult = 'Cancel' }
+    $d.CancelButton = $bC
+    $txt.Text = Get-StatusText
+    $bR.Add_Click({ Safe { $txt.Text = Get-StatusText } })
+    $bL.Add_Click({ Safe {
+        $log = Join-Path $NGDir 'log.txt'
+        if (Test-Path $log) { Start-Process notepad.exe -ArgumentList "`"$log`"" } else { Msg 'Nothing logged yet.' }
+    } })
+    [void]$d.ShowDialog($script:form)
+    $d.Dispose()
 }
 
 # ---------------------------------------------------------------- Schedule tab
 New-Ctl 'Label' $tSched @{ Location = (P 16 12); Size = (S 890 44); Font = $FontRow
-    Text = "Tick the nights NightGuard should guard. Each night is named after the evening it starts, so a bedtime after midnight (like 12:30 AM) on Monday night means early Tuesday morning." } | Out-Null
+    Text = "When should your PC tuck you in? Tick the nights NightGuard should guard. Each night is named after the evening it starts, so a 12:30 AM bedtime on Monday night means early Tuesday morning." } | Out-Null
 New-Ctl 'Label' $tSched @{ Location = (P 16 58); Size = (S 600 20); ForeColor = $Gray; Text = $TimeHint } | Out-Null
 New-Ctl 'Label' $tSched @{ Text = 'Night'; Location = (P 16 88); Size = (S 150 20); Font = $FontBold } | Out-Null
 New-Ctl 'Label' $tSched @{ Text = 'Bedtime'; Location = (P 190 88); Size = (S 110 20); Font = $FontBold } | Out-Null
@@ -387,18 +424,18 @@ $bQWeek.Add_Click({ Set-QuickNights @('Sun', 'Mon', 'Tue', 'Wed', 'Thu') })
 $bQEnd.Add_Click({ Set-QuickNights @('Fri', 'Sat') })
 
 New-Ctl 'Label' $tSched @{ Location = (P 16 412); Size = (S 890 44); ForeColor = $Gray
-    Text = "Safety limits: a night can be at most 16 hours, and there must be at least 6 free hours between nights, so the PC is always usable during the day." } | Out-Null
+    Text = "Safety limits: a night can be at most 16 hours, and there must be at least 6 free hours between nights. NightGuard wants you asleep, not locked out of your own day." } | Out-Null
 
 # ---------------------------------------------------------------- Warnings tab
 New-Ctl 'Label' $tWarn @{ Location = (P 16 12); Size = (S 890 44); Font = $FontRow
-    Text = "Up to 6 popups before bedtime. Tick the ones you want. In the message you can use {minutes} {bedtime} {unlock} {action}, and \n for a new line." } | Out-Null
-New-Ctl 'Label' $tWarn @{ Text = 'On'; Location = (P 16 66); Size = (S 40 20); Font = $FontBold } | Out-Null
-New-Ctl 'Label' $tWarn @{ Text = 'Minutes before bedtime'; Location = (P 60 66); Size = (S 170 20); Font = $FontBold } | Out-Null
-New-Ctl 'Label' $tWarn @{ Text = 'Sound'; Location = (P 236 66); Size = (S 60 20); Font = $FontBold } | Out-Null
-New-Ctl 'Label' $tWarn @{ Text = 'Message'; Location = (P 300 66); Size = (S 200 20); Font = $FontBold } | Out-Null
+    Text = "Popups that nudge you before bedtime: gentle at first, then less gentle. Tick the ones you want (up to 6), and click Preview to see exactly how each one looks." } | Out-Null
+New-Ctl 'Label' $tWarn @{ Text = 'On'; Location = (P 16 62); Size = (S 40 20); Font = $FontBold } | Out-Null
+New-Ctl 'Label' $tWarn @{ Text = 'Minutes before bedtime'; Location = (P 60 62); Size = (S 170 20); Font = $FontBold } | Out-Null
+New-Ctl 'Label' $tWarn @{ Text = 'Sound'; Location = (P 236 62); Size = (S 60 20); Font = $FontBold } | Out-Null
+New-Ctl 'Label' $tWarn @{ Text = 'Message'; Location = (P 300 62); Size = (S 200 20); Font = $FontBold } | Out-Null
 $warnOn = @(); $warnMin = @(); $warnSnd = @(); $warnMsg = @(); $warnPrev = @()
 for ($i = 0; $i -lt 6; $i++) {
-    $y = 92 + $i * 50
+    $y = 86 + $i * 44
     $warnOn  += New-Ctl 'CheckBox' $tWarn @{ Location = (P 20 ($y + 4)); Size = (S 30 24) }
     $warnMin += New-Ctl 'NumericUpDown' $tWarn @{ Location = (P 60 $y); Size = (S 80 28); Minimum = 1; Maximum = 360; Value = 15; Font = $FontRow }
     New-Ctl 'Label' $tWarn @{ Text = 'min'; Location = (P 145 ($y + 4)); Size = (S 40 22); Font = $FontRow } | Out-Null
@@ -417,15 +454,50 @@ for ($i = 0; $i -lt 6; $i++) {
     $warnMin[$i].Add_ValueChanged({ Update-Validation })
 }
 
+# How to write a good popup
+$grpTips = New-Ctl 'GroupBox' $tWarn @{ Text = 'How to write a popup that actually works on you'; Location = (P 16 354); Size = (S 640 230); Font = $FontRowB }
+New-Ctl 'Label' $grpTips @{ Location = (P 12 26); Size = (S 618 198); Font = $FontUI; Text = @'
+These words fill themselves in:
+     {minutes}  minutes left          {bedtime}  bedtime, like 12:00 AM
+     {action}   what happens, like "hibernate"     {unlock}  when the PC unlocks
+Type \n to start a new line.
+
+Tips:
+  - Keep it short: one line of news, one line of what to do.
+  - Start kind and get firmer. Future you responds better to a plan than a lecture.
+  - Example, 30 min before:  Heads up! Bedtime in {minutes} minutes.\nWrap up this round.
+  - Example, 5 min before:   FINAL WARNING!\nThe PC will {action} at {bedtime}. Save NOW.
+'@ } | Out-Null
+$bWarnFun  = New-Ctl 'Button' $tWarn @{ Text = 'Fill in example messages'; Location = (P 672 362); Size = (S 233 38) }
+$bPrevCd   = New-Ctl 'Button' $tWarn @{ Text = 'Preview the bedtime countdown'; Location = (P 672 408); Size = (S 233 38) }
+New-Ctl 'Label' $tWarn @{ Location = (P 672 454); Size = (S 233 120); ForeColor = $Gray
+    Text = 'The countdown is the last window you see at bedtime, right before the PC does its thing. Its length is set on the next step.' } | Out-Null
+
+$WarnExamples = @(
+    @{ Min = 30; Msg = 'Heads up! Bedtime in {minutes} minutes.\nThe PC will {action} at {bedtime}. Time to start wrapping up.' }
+    @{ Min = 10; Msg = '{minutes} minutes to go.\nFinish this round and save your stuff. No starting new ones. Yes, we know.' }
+    @{ Min = 0;  Msg = 'FINAL WARNING!\nThe PC will {action} at {bedtime}. Save NOW.\nFuture you says thanks.' }
+)
+$bWarnFun.Add_Click({ Safe {
+    if (-not (Confirm-Ask 'Replace the messages of the ticked popups with example messages that match their timing?')) { return }
+    for ($i = 0; $i -lt 6; $i++) {
+        if (-not $warnOn[$i].Checked) { continue }
+        $m = [int]$warnMin[$i].Value
+        $warnMsg[$i].Text = @($WarnExamples | Where-Object { $m -ge $_.Min })[0].Msg
+    }
+} })
+
 # ---------------------------------------------------------------- Bedtime action tab
-New-Ctl 'Label' $tAct @{ Text = 'At bedtime the PC will:'; Location = (P 10 16); Size = (S 200 20); Font = $FontBold } | Out-Null
-$cboAction = New-Ctl 'ComboBox' $tAct @{ Location = (P 220 13); Size = (S 160 24); DropDownStyle = 'DropDownList' }
+New-Ctl 'Label' $tAct @{ Location = (P 10 10); Size = (S 880 24); Font = $FontRow
+    Text = "Bedtime has arrived. Your game disagrees. Here's how NightGuard settles the argument." } | Out-Null
+New-Ctl 'Label' $tAct @{ Text = 'At bedtime the PC will:'; Location = (P 10 52); Size = (S 200 20); Font = $FontBold } | Out-Null
+$cboAction = New-Ctl 'ComboBox' $tAct @{ Location = (P 220 49); Size = (S 160 24); DropDownStyle = 'DropDownList' }
 foreach ($a in $NGActions) { [void]$cboAction.Items.Add($a) }
-$lblActDesc = New-Ctl 'Label' $tAct @{ Location = (P 400 16); Size = (S 430 40); ForeColor = [System.Drawing.Color]::DimGray }
+$lblActDesc = New-Ctl 'Label' $tAct @{ Location = (P 400 46); Size = (S 500 62); ForeColor = [System.Drawing.Color]::DimGray }
 $ActDesc = @{
     Shutdown  = 'Strongest. Closes everything; unsaved work is lost. Can wake a sleeping PC to shut it down.'
     Sleep     = 'Medium. Quick to resume, but it goes back to sleep every few minutes during the night.'
-    Hibernate = 'Strong. Saves open apps to disk. If hibernate is off on this PC, it shuts down instead.'
+    Hibernate = 'Recommended. Saves your open apps to disk and powers off, so they are usually still there in the morning (not guaranteed, so save anyway). If hibernate is off in Windows, NightGuard offers to turn it on when you install.'
     Lock      = 'Weakest. Locks the screen, again every few minutes, but you can keep signing back in.'
     SignOut   = 'Medium. Closes all your apps and signs you out, again if you sign back in.'
 }
@@ -437,19 +509,19 @@ function New-Num($Parent, [string]$Label, [int]$Y, [int]$Min, [int]$Max, [string
     New-Ctl 'Label' $Parent @{ Text = $Hint; Location = (P 310 ($Y + 3)); Size = (S 520 20); ForeColor = [System.Drawing.Color]::DimGray } | Out-Null
     return $n
 }
-$numCountdown = New-Num $tAct 'Countdown (seconds)' 70 15 600 'Notice before it happens (15 to 600 seconds).'
-$numRecheck   = New-Num $tAct 'Repeat every (minutes)' 105 1 60 'During the night it repeats, so switching the PC back on does not help.'
-$numNight     = New-Num $tAct 'Night mode (minutes)' 140 0 240 'Settings and uninstall are locked from this long before bedtime until unlock.'
+$numCountdown = New-Num $tAct 'Countdown (seconds)' 120 15 600 'Last call: time to hit Save before it happens (15 to 600 seconds).'
+$numRecheck   = New-Num $tAct 'Repeat every (minutes)' 155 1 60 'Switched the PC back on at night? Nice try. It happens again this often.'
+$numNight     = New-Num $tAct 'Night mode (minutes)' 190 0 240 'Settings and uninstall are locked from this long before bedtime until unlock.'
 
-$chkEnd = New-Ctl 'CheckBox' $tAct @{ Text = 'Stop after an end date (last locked night):'; Location = (P 10 190); Size = (S 300 24) }
-$dtpEnd = New-Ctl 'DateTimePicker' $tAct @{ Location = (P 320 190); Size = (S 160 24); Format = 'Custom'; CustomFormat = 'ddd yyyy-MM-dd'; Enabled = $false }
+$chkEnd = New-Ctl 'CheckBox' $tAct @{ Text = 'Stop after an end date (last locked night):'; Location = (P 10 240); Size = (S 300 24) }
+$dtpEnd = New-Ctl 'DateTimePicker' $tAct @{ Location = (P 320 240); Size = (S 160 24); Format = 'Custom'; CustomFormat = 'ddd yyyy-MM-dd'; Enabled = $false }
 $chkEnd.Add_CheckedChanged({ $dtpEnd.Enabled = $chkEnd.Checked })
-New-Ctl 'Label' $tAct @{ Location = (P 10 222); Size = (S 820 40); ForeColor = [System.Drawing.Color]::DimGray
-    Text = 'After that night, NightGuard removes itself completely (tasks, blocks and files).' } | Out-Null
+New-Ctl 'Label' $tAct @{ Location = (P 10 272); Size = (S 820 40); ForeColor = [System.Drawing.Color]::DimGray
+    Text = 'Trying it out for a month? After that night, NightGuard removes itself completely (tasks, blocks and files).' } | Out-Null
 
 # ---------------------------------------------------------------- Blocking tab
-$chkBlock = New-Ctl 'CheckBox' $tBlock @{ Text = 'Turn on site and app blocking'; Location = (P 10 10); Size = (S 300 24); Font = $FontBold }
-$chkBlockBed = New-Ctl 'CheckBox' $tBlock @{ Text = 'Also block during bedtime hours'; Location = (P 320 10); Size = (S 300 24) }
+$chkBlock = New-Ctl 'CheckBox' $tBlock @{ Text = 'Turn on site and app blocking (goodbye, 1 AM doomscrolling)'; Location = (P 10 10); Size = (S 450 24); Font = $FontBold }
+$chkBlockBed = New-Ctl 'CheckBox' $tBlock @{ Text = 'Also block during bedtime hours'; Location = (P 520 10); Size = (S 300 24) }
 
 New-Ctl 'Label' $tBlock @{ Text = 'Websites (one per line):'; Location = (P 10 44); Size = (S 260 20) } | Out-Null
 $txtSites = New-Ctl 'TextBox' $tBlock @{ Location = (P 10 66); Size = (S 250 330); Multiline = $true; ScrollBars = 'Vertical'; Font = $FontMono }
@@ -478,7 +550,18 @@ for ($i = 0; $i -lt 4; $i++) {
     New-Ctl 'Label' $tBlock @{ Text = 'to'; Location = (P ($x0 + 457) ($y + 5)); Size = (S 22 20) } | Out-Null
     $slotTo += New-TimePicker $tBlock ($x0 + 482) $y '17:00'
 }
-foreach ($c in $slotOn) { $c.Add_CheckedChanged({ Update-Validation }) }
+# Everything on this page is greyed out until blocking is ticked; each time slot row until its own tick
+function Update-BlockEnabled {
+    $on = $chkBlock.Checked
+    foreach ($c in $tBlock.Controls) { if ($c -ne $chkBlock) { $c.Enabled = $on } }
+    for ($i = 0; $i -lt 4; $i++) {
+        $rowOn = $on -and $slotOn[$i].Checked
+        foreach ($c in $slotDays[$i]) { $c.Enabled = $rowOn }
+        $slotFrom[$i].Enabled = $rowOn; $slotTo[$i].Enabled = $rowOn
+    }
+}
+$chkBlock.Add_CheckedChanged({ Update-BlockEnabled; Update-Validation })
+foreach ($c in $slotOn) { $c.Add_CheckedChanged({ Update-BlockEnabled; Update-Validation }) }
 
 New-Ctl 'Label' $tBlock @{ Location = (P 280 400); Size = (S 630 90); ForeColor = [System.Drawing.Color]::DimGray
     Text = "Sites are blocked in a marked section of the Windows hosts file; apps with Windows Firewall rules named 'NightGuard'. Both are removed automatically when the time slot ends, on uninstall, and if anything goes wrong. Browsers with 'secure DNS' turned on can get around site blocking (see the README). Blocking an app cuts its internet; it does not close it." } | Out-Null
@@ -507,76 +590,57 @@ $bAddDir.Add_Click({
 $bDelApp.Add_Click({ if ($lstApps.SelectedIndex -ge 0) { $lstApps.Items.RemoveAt($lstApps.SelectedIndex) } })
 
 # ---------------------------------------------------------------- Trusted person tab
-New-Ctl 'Label' $tTrust @{ Location = (P 10 10); Size = (S 820 80); Font = (New-Object System.Drawing.Font('Segoe UI', 10)); Text = @'
-Trusted-person mode makes NightGuard much harder to undo. You give an 8-digit code to someone you trust, such as a parent, partner or friend. After that, changing any setting or uninstalling needs that code.
+New-Ctl 'Label' $tTrust @{ Location = (P 10 10); Size = (S 890 64); Font = $FontRow; Text = @'
+Know yourself too well? Hand the off switch to someone else. A trusted person (parent, partner, friend, the roommate who's tired of hearing you game at 3 AM) sets a secret 8-digit code. After that, changing settings or uninstalling needs their code.
 '@ } | Out-Null
-$lblTrustState = New-Ctl 'Label' $tTrust @{ Location = (P 10 96); Size = (S 820 26); Font = $FontBig }
-New-Ctl 'Label' $tTrust @{ Text = "Trusted person's email (optional):"; Location = (P 10 140); Size = (S 220 20) } | Out-Null
-$txtContact = New-Ctl 'TextBox' $tTrust @{ Location = (P 240 137); Size = (S 300 24) }
-$bTrustOn  = New-Ctl 'Button' $tTrust @{ Text = 'Turn on and create code...'; Location = (P 10 180); Size = (S 220 34); Font = $FontBold }
-$bNewCode  = New-Ctl 'Button' $tTrust @{ Text = 'Create a new code...'; Location = (P 240 180); Size = (S 180 34) }
-$bTrustOff = New-Ctl 'Button' $tTrust @{ Text = 'Turn off...'; Location = (P 430 180); Size = (S 120 34) }
-New-Ctl 'Label' $tTrust @{ Location = (P 10 236); Size = (S 820 150); ForeColor = $Red; Font = $FontBold; Text = @'
+$chkTrust = New-Ctl 'CheckBox' $tTrust @{ Text = 'Use a trusted-person code'; Location = (P 10 84); Size = (S 400 26); Font = $FontRowB }
+$lblTrustState = New-Ctl 'Label' $tTrust @{ Location = (P 10 116); Size = (S 890 44); Font = $FontRow }
+New-Ctl 'Label' $tTrust @{ Text = "Trusted person's name (optional):"; Location = (P 10 168); Size = (S 230 22) } | Out-Null
+$txtContact = New-Ctl 'TextBox' $tTrust @{ Location = (P 245 165); Size = (S 300 24); MaxLength = 60 }
+$bNewCode  = New-Ctl 'Button' $tTrust @{ Text = 'Trusted person: change the code...'; Location = (P 10 206); Size = (S 260 34) }
+$bTrustOff = New-Ctl 'Button' $tTrust @{ Text = 'Turn off...'; Location = (P 280 206); Size = (S 120 34) }
+New-Ctl 'Label' $tTrust @{ Location = (P 10 262); Size = (S 890 200); ForeColor = $Red; Font = $FontBold; Text = @'
 WARNING: THERE IS NO WAY TO RECOVER A LOST CODE.
-If the code is lost, settings and uninstall stay locked for good. The code is shown only once and this PC keeps only a scrambled copy.
+The trusted person types the code in themselves, twice, and it is never shown, emailed or printed. This PC keeps only a scrambled copy. If they forget it, settings and uninstall stay locked for good.
 Wrong codes lock the code box for 15 minutes after 5 tries, and longer after each further try.
 
 (NightGuard still never stops the PC working outside bedtime hours, and the end date still removes it.)
 '@ } | Out-Null
 
 function Update-TrustTab {
-    $installed = [bool](Get-NGConfig)
     $t = Get-NGTrusted
     if ($t) {
-        $lblTrustState.Text = 'Trusted-person mode is ON'
+        $chkTrust.Checked = $true
+        $chkTrust.Enabled = $false
+        $lblTrustState.Text = 'Trusted-person mode is ON. Saving changes or uninstalling needs the code.'
         $lblTrustState.ForeColor = [System.Drawing.Color]::DarkGreen
-        if ($t.Contact) { $txtContact.Text = $t.Contact }
     } else {
-        $lblTrustState.Text = $(if ($installed) { 'Trusted-person mode is off' } else { 'Install NightGuard first (Install button below)' })
-        $lblTrustState.ForeColor = [System.Drawing.Color]::DimGray
+        $chkTrust.Enabled = $true
+        $lblTrustState.Text = $(if ($chkTrust.Checked) { 'Your trusted person sets the code right after you click Install / Save on the last page, so have them next to you then.' } else { 'Off. Anyone with an admin account on this PC can change the settings.' })
+        $lblTrustState.ForeColor = $(if ($chkTrust.Checked) { [System.Drawing.Color]::FromArgb(40, 50, 120) } else { $Gray })
     }
-    $bTrustOn.Enabled  = $installed -and -not $t
-    $bNewCode.Enabled  = [bool]$t
-    $bTrustOff.Enabled = [bool]$t
+    $txtContact.Enabled = $chkTrust.Checked -and -not $t
+    $bNewCode.Visible  = [bool]$t
+    $bTrustOff.Visible = [bool]$t
 }
-
-function Test-ContactOk {
-    $c = $txtContact.Text.Trim()
-    if ($c -and $c -notmatch '^[^@\s]+@[^@\s]+\.[^@\s]+$') { Msg 'That email address looks wrong.' 'Warning'; return $false }
-    return $true
-}
-
-$bTrustOn.Add_Click({ Safe {
-    if (-not (Test-ContactOk)) { return }
-    if (-not (Confirm-Ask "Save any settings changes first. After this, every change needs the code.`n`nContinue?")) { return }
-    if (-not (Show-CodeWarning)) { return }
-    $code = New-NGCode
-    if (Show-NewCode $code $txtContact.Text.Trim()) {
-        Set-NGTrusted $code $txtContact.Text.Trim()
-        Write-NGLog 'trusted-person mode turned on'
-        Msg 'Trusted-person mode is on. From now on, changes and uninstall need the code.'
-    } else {
-        Msg 'Cancelled. Trusted-person mode is still off, and that code was thrown away.'
-    }
-    Update-Status
-} })
+$chkTrust.Add_CheckedChanged({ Update-TrustTab })
 
 $bNewCode.Add_Click({ Safe {
     $blk = Get-NGBlockedReason (Get-NGConfig); if ($blk) { throw $blk }
-    if (-not (Test-ContactOk)) { return }
-    $old = Read-Code 'To create a new code, first enter the current one.'
+    $t = Get-NGTrusted
+    $old = Read-Code 'To change the code, first enter the current one.'
     if ($null -eq $old) { return }
     Assert-NGCode $old
     if (-not (Show-CodeWarning)) { return }
-    $code = New-NGCode
-    if (Show-NewCode $code $txtContact.Text.Trim()) {
-        Set-NGTrusted $code $txtContact.Text.Trim()
+    $code = Read-NewCode ([string]$t.Contact)
+    if ($code) {
+        Set-NGTrusted $code ([string]$t.Contact)
         Write-NGLog 'trusted-person code changed'
         Msg 'The new code is active. The old code no longer works.'
     } else {
         Msg 'Cancelled. The old code still works.'
     }
-    Update-Status
+    Update-Welcome
 } })
 
 $bTrustOff.Add_Click({ Safe {
@@ -586,19 +650,20 @@ $bTrustOff.Add_Click({ Safe {
     Assert-NGCode $code
     Remove-NGTrusted
     Write-NGLog 'trusted-person mode turned off'
+    $chkTrust.Checked = $false
     Msg 'Trusted-person mode is off.'
-    Update-Status
+    Update-Welcome
 } })
 
 # ---------------------------------------------------------------- Screen time tab
-$chkST = New-Ctl 'CheckBox' $tScreen @{ Text = 'Turn on daily game and screen time limits'; Location = (P 10 10); Size = (S 400 24); Font = $FontBold }
+$chkST = New-Ctl 'CheckBox' $tScreen @{ Text = 'Turn on daily game and screen time budgets'; Location = (P 10 10); Size = (S 400 24); Font = $FontBold }
 $lblUsage = New-Ctl 'Label' $tScreen @{ Location = (P 420 8); Size = (S 410 50); Font = $FontMono }
 
 function New-STNum([string]$Label, [int]$X, [int]$Y, [int]$Min, [int]$Max) {
     New-Ctl 'Label' $tScreen @{ Text = $Label; Location = (P $X ($Y + 3)); Size = (S 150 20) } | Out-Null
     return (New-Ctl 'NumericUpDown' $tScreen @{ Location = (P ($X + 155) $Y); Size = (S 70 24); Minimum = $Min; Maximum = $Max })
 }
-New-Ctl 'Label' $tScreen @{ Text = 'Minutes per day (0 = no limit):'; Location = (P 10 48); Size = (S 400 20); ForeColor = [System.Drawing.Color]::DimGray } | Out-Null
+New-Ctl 'Label' $tScreen @{ Text = '"Just one more game" ends here. Minutes per day (0 = no limit):'; Location = (P 10 48); Size = (S 500 20); ForeColor = [System.Drawing.Color]::DimGray } | Out-Null
 $numGWd = New-STNum 'Games, weekdays' 10 72 0 1440
 $numGWe = New-STNum 'Games, weekends' 10 102 0 1440
 $numSWd = New-STNum 'Screen, weekdays' 260 72 0 1440
@@ -634,19 +699,36 @@ $bAddGF.Add_Click({
         else { $txtGFolders.Lines = @(@($txtGFolders.Lines | Where-Object { $_.Trim() }) + $dlg.SelectedPath) }
     }
 })
+# Everything on this page is greyed out until the top tick is on; the shutdown notice only matters for Shutdown
+function Update-STEnabled {
+    $on = $chkST.Checked
+    foreach ($c in $tScreen.Controls) { if ($c -ne $chkST -and $c -ne $lblUsage) { $c.Enabled = $on } }
+    $numGrace.Enabled = $on -and ([string]$cboST.SelectedItem -eq 'Shutdown')
+}
+$chkST.Add_CheckedChanged({ Update-STEnabled; Update-Validation })
+$cboST.Add_SelectedIndexChanged({ Update-STEnabled })
 $bUsage.Add_Click({ Safe { $c = Get-NGConfig; $lblUsage.Text = $(if ($c) { Get-NGUsageText $c } else { '' }) } })
 
 # ---------------------------------------------------------------- Review page
-New-Ctl 'Label' $tReview @{ Text = 'Review and save'; Location = (P 16 12); Size = (S 600 30); Font = $FontBig } | Out-Null
+New-Ctl 'Label' $tReview @{ Text = 'Last stop: review and install'; Location = (P 16 12); Size = (S 600 30); Font = $FontBig } | Out-Null
 New-Ctl 'Label' $tReview @{ Location = (P 16 46); Size = (S 890 24); Font = $FontRow
-    Text = 'Here is everything NightGuard will do. Go back to any step to change it, then click Save.' } | Out-Null
-$txtReview = New-Ctl 'TextBox' $tReview @{ Location = (P 16 78); Size = (S 895 500); Multiline = $true; ReadOnly = $true; ScrollBars = 'Vertical'
+    Text = "Here's everything NightGuard will do. Anything look off? Go back and fix it. All good? Tick the box below." } | Out-Null
+$txtReview = New-Ctl 'TextBox' $tReview @{ Location = (P 16 78); Size = (S 895 450); Multiline = $true; ReadOnly = $true; ScrollBars = 'Vertical'
     Font = (New-Object System.Drawing.Font('Consolas', 10.5)); BackColor = [System.Drawing.Color]::White }
+$chkCorrect = New-Ctl 'CheckBox' $tReview @{ Text = 'Yes, these settings are correct.'; Location = (P 16 540); Size = (S 890 30); Font = $FontRowB }
+
+# Ticking the box shows the Install / Save button. With a new trusted-person code, the risk warning comes first.
+$chkCorrect.Add_CheckedChanged({
+    if ($chkCorrect.Checked -and $chkTrust.Checked -and -not (Get-NGTrusted)) {
+        if (-not (Show-CodeWarning)) { $chkCorrect.Checked = $false }
+    }
+    Update-Nav
+})
 
 function Update-Review {
     $sb = New-Object System.Text.StringBuilder
     $add = { param($l) [void]$sb.AppendLine($l) }
-    try { $cfg = Read-Form } catch { $txtReview.Text = $_.Exception.Message; return }
+    try { $cfg = Read-Form } catch { $txtReview.Text = $_.Exception.Message; $chkCorrect.Checked = $false; $chkCorrect.Enabled = $false; return }
     $errs = Test-NGConfig $cfg
     if ($errs.Count -gt 0) {
         & $add 'PLEASE FIX THESE FIRST:'
@@ -689,8 +771,11 @@ function Update-Review {
     } else { & $add '  off' }
     & $add ''
     & $add 'TRUSTED PERSON'
-    & $add $(if (Get-NGTrusted) { '  ON, saving needs the code' } else { '  off (set it up on the Trusted person step, after installing)' })
+    & $add $(if (Get-NGTrusted) { '  ON, saving needs the code' } elseif ($chkTrust.Checked) { '  ON: your trusted person sets the code right after you click ' + $btnSave.Text } else { '  off' })
     $txtReview.Text = $sb.ToString()
+    # Confirm again every time the review is shown, since settings may have changed
+    $chkCorrect.Checked = $false
+    $chkCorrect.Enabled = ($errs.Count -eq 0)
 }
 
 # ============================================================================
@@ -766,6 +851,8 @@ function Load-Form($Cfg) {
         }
     }
     $script:loading = $false
+    Update-STEnabled
+    Update-BlockEnabled
     Update-Validation
 }
 
@@ -836,7 +923,26 @@ function Get-StartingConfig {
 function Reload-Form {
     $cfg = Get-StartingConfig
     Load-Form $cfg
-    Update-Status
+    $chkTrust.Checked = [bool](Get-NGTrusted)
+    $txtContact.Text = $(if (Get-NGTrusted) { [string](Get-NGTrusted).Contact } else { '' })
+    Update-Welcome
+    if ($tabs.SelectedTab -eq $tReview) { Update-Review }
+    Update-Nav
+}
+
+# Hibernate needs hibernation switched on in Windows (it's off on many desktops)
+function Test-HibernateOn {
+    try { return ([int](Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power' -Name HibernateEnabled -ErrorAction Stop).HibernateEnabled -eq 1) }
+    catch { return $false }
+}
+function Confirm-Hibernate {
+    if (Test-HibernateOn) { return }
+    $q = "Hibernate is switched off in Windows on this PC.`n`nTurn it on now? Windows sets aside some disk space for it (a file about half the size of your RAM).`n`n" +
+         "If you choose No, NightGuard will shut down instead of hibernating at bedtime."
+    if (-not (Confirm-Ask $q)) { return }
+    try { & powercfg.exe /hibernate on 2>$null | Out-Null } catch { }
+    if (Test-HibernateOn) { Write-NGLog 'hibernate turned on in Windows (with consent)' }
+    else { Msg "Windows wouldn't turn hibernate on (some PCs don't support it). At bedtime NightGuard will shut down instead." 'Warning' }
 }
 
 # ============================================================================
@@ -850,17 +956,33 @@ $btnSave.Add_Click({ Safe {
     $blk = Get-NGBlockedReason (Get-NGConfig); if ($blk) { throw $blk }
     $code = Get-CodeIfNeeded 'Saving changes needs the code.'
     if ($null -eq $code) { return }
+    $wantTrust = $chkTrust.Checked -and -not (Get-NGTrusted)
+    $trustName = $txtContact.Text.Trim()
+    if ($cfg.Action -eq 'Hibernate') { Confirm-Hibernate }
+    $wasInstalled = [bool](Get-NGConfig)
     $tmp = Join-Path $env:TEMP 'nightguard-settings.json'
     Set-Content -Path $tmp -Value (ConvertTo-NGJson $cfg) -Encoding UTF8
     $form.Cursor = 'WaitCursor'
     try { & (Join-Path $PSScriptRoot 'install.ps1') -ConfigPath $tmp -Code $code -NoPause -ThrowOnError | Out-Null }
     finally { $form.Cursor = 'Default'; Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
+    $done = if ($wasInstalled) { 'Saved. Your new settings are active.' } else { 'NightGuard is installed and on duty. Sweet dreams!' }
+    if ($wantTrust) {
+        $newCode = Read-NewCode $trustName
+        if ($newCode) {
+            Set-NGTrusted $newCode $trustName
+            Write-NGLog 'trusted-person mode turned on'
+            $done += "`n`nTrusted-person mode is on. From now on, changes and uninstall need the trusted person's code."
+        } else {
+            $done += "`n`nThe trusted-person code was cancelled, so trusted-person mode is still off. You can turn it on later on the Trusted person step."
+        }
+    }
+    $tabs.SelectedIndex = 0
     Reload-Form
-    Msg 'Saved. Your settings are active.'
+    Msg $done
 } })
 
 $btnDiscard.Add_Click({ Safe { Reload-Form } })
-$bRefresh.Add_Click({ Safe { Update-Status } })
+$bStatus.Add_Click({ Safe { Show-StatusDialog } })
 
 function Invoke-Preview([string]$Script, [string[]]$ScriptArgs, $Cfg = $null) {
     if (-not $Cfg) { $Cfg = Read-Form }
@@ -871,7 +993,6 @@ function Invoke-Preview([string]$Script, [string[]]$ScriptArgs, $Cfg = $null) {
     Set-Content -Path (Join-Path $tmp 'config.json') -Value (ConvertTo-NGJson $Cfg) -Encoding UTF8
     Start-Process powershell.exe -ArgumentList (@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', "`"$(Join-Path $tmp $Script)`"") + $ScriptArgs)
 }
-$bPrevWarn.Add_Click({ Safe { Invoke-Preview 'warn.ps1' @('-Preview', '-Index', '1') } })
 $bPrevCd.Add_Click({ Safe { Invoke-Preview 'session.ps1' @('-Preview') } })
 foreach ($wb in $warnPrev) {
     $wb.Add_Click({ param($sender, $e) Safe {
@@ -881,11 +1002,6 @@ foreach ($wb in $warnPrev) {
         Invoke-Preview 'warn.ps1' @('-Preview', '-Index', '1') $cfg
     } })
 }
-$bLog.Add_Click({ Safe {
-    $log = Join-Path $NGDir 'log.txt'
-    if (Test-Path $log) { Start-Process notepad.exe -ArgumentList "`"$log`"" } else { Msg 'Nothing logged yet.' }
-} })
-
 
 $bUninst.Add_Click({ Safe {
     $blk = Get-NGBlockedReason (Get-NGConfig); if ($blk) { throw $blk }
@@ -893,22 +1009,13 @@ $bUninst.Add_Click({ Safe {
     $code = Get-CodeIfNeeded 'Uninstalling needs the code.'
     if ($null -eq $code) { return }
     & (Join-Path $PSScriptRoot 'uninstall.ps1') -Code $code -NoPause -ThrowOnError | Out-Null
-    Msg 'NightGuard has been removed.'
+    Msg 'NightGuard has been removed. Go to bed anyway. ;)'
     $form.Close()
 } })
 
-# Refresh the status tab every 30 seconds while it's showing
-$timer = New-Object System.Windows.Forms.Timer
-$timer.Interval = 30000
-$timer.Add_Tick({ if ($tabs.SelectedTab -eq $tStatus) { try { $txtStatus.Text = Get-StatusText } catch { } } })
-$timer.Start()
-
 try {
     Reload-Form
-    Update-Nav
     [void]$form.ShowDialog()
 } catch {
     [void][System.Windows.Forms.MessageBox]::Show("NightGuard could not start: $($_.Exception.Message)`n`nYou can use TextMenu.cmd instead.", 'NightGuard', 'OK', 'Error')
-} finally {
-    $timer.Stop()
 }
