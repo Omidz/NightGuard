@@ -16,7 +16,7 @@
   <Package Name="NightGuard" Manufacturer="NightGuard" Version="$(var.ProductVersion)"
            UpgradeCode="378FAA9D-BA70-46A4-9F3D-DAB3B311DCC6" Scope="perMachine" Compressed="yes" Language="1033">
 
-    <MajorUpgrade Schedule="afterInstallInitialize" AllowSameVersionUpgrades="yes"
+    <MajorUpgrade Schedule="afterInstallInitialize"
                   DowngradeErrorMessage="A newer version of NightGuard is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
@@ -35,12 +35,24 @@
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="NightGuard" />
     </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
 
     <!-- Everything that was published, except the service executable (it gets its own component below) -->
     <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
       <Files Include="$(var.PublishDir)**">
         <Exclude Files="$(var.PublishDir)NightGuard.Service.exe" />
+        <Exclude Files="$(var.PublishDir)NightGuard.exe" />
       </Files>
+    </ComponentGroup>
+
+    <!-- The app, with its Start Menu shortcut (keyed to the file, as Windows Installer prefers) -->
+    <ComponentGroup Id="App" Directory="INSTALLFOLDER">
+      <Component Id="AppExe" Bitness="always64">
+        <File Id="AppExeFile" Source="$(var.PublishDir)NightGuard.exe" KeyPath="yes">
+          <Shortcut Id="AppShortcut" Directory="ProgramMenuFolder" Name="NightGuard" Description="Your bedtime bouncer"
+                    WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" Advertise="no" />
+        </File>
+      </Component>
     </ComponentGroup>
 
     <ComponentGroup Id="Service" Directory="INSTALLFOLDER">
@@ -56,18 +68,11 @@
       </Component>
     </ComponentGroup>
 
-    <StandardDirectory Id="ProgramMenuFolder">
-      <Component Id="StartMenuShortcut" Guid="6C1A7F3E-2B7D-4C1E-9A55-3F0B8E2D4A11">
-        <Shortcut Id="AppShortcut" Name="NightGuard" Description="Your bedtime bouncer"
-                  Target="[INSTALLFOLDER]NightGuard.exe" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
-        <RegistryValue Root="HKLM" Key="Software\NightGuard" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
-      </Component>
-    </StandardDirectory>
 
     <Feature Id="Main" Title="NightGuard" Level="1">
       <ComponentGroupRef Id="AppFiles" />
       <ComponentGroupRef Id="Service" />
-      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentGroupRef Id="App" />
     </Feature>
 
     <!-- Uninstall / upgrade: close the app everywhere and remove the watchdog while the service still runs,
