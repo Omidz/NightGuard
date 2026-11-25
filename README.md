@@ -25,7 +25,7 @@ NightGuard warns you before bedtime, then **powers your PC off** (hibernate by d
 
 ## 🚀 Quick start (about two minutes)
 
-1. **Download** [**NightGuard.zip**](https://github.com/Omidz/NightGuard/releases/latest/download/NightGuard.zip) from the [latest release](https://github.com/Omidz/NightGuard/releases/latest). Just that one file.
+1. **Download** [**NightGuard.zip**](https://github.com/Omidz/NightGuard/releases/latest/download/NightGuard.zip) from the [latest release](https://github.com/Omidz/NightGuard/releases/latest). Just that one file. (Link not working? Use the green **Code** button > **Download ZIP** instead, same thing.)
 2. **Unblock it** so Windows doesn't nag: right-click the zip > **Properties** > tick **Unblock** at the bottom > **OK**. (No Unblock box? Fine, skip it.)
 3. **Unzip** it anywhere, for example your Downloads folder.
 4. **Double-click `NightGuard.cmd`** and click **Yes** on the admin prompt. (Blue "Windows protected your PC" screen? Click **More info** > **Run anyway**. More fixes in the SmartScreen section just below.)
