@@ -59,18 +59,18 @@ Once it's installed, the Start Menu shortcut won't be blocked again.
 
 ## 🎛️ Settings
 
-NightGuard opens as a step-by-step wizard. Use **Next** and **Back**, or jump to any step in the list on the left. Nothing changes until you click **Save**. To change something later, open NightGuard again and go straight to that step.
+NightGuard opens as a step-by-step wizard. Use **Next** and **Back**, or jump to any step in the list on the left. Nothing changes until you click **Save and apply** (or **Install NightGuard** the first time). To change something later, open NightGuard again and go straight to that step.
 
-Times are shown the same way as your Windows clock: 12-hour with AM/PM, or 24-hour. Click the hour or minute and use the arrows, or just type.
+Times are shown the same way as your Windows clock: 12-hour with AM/PM, or 24-hour. Each time box is labelled with the format it uses. Click the hour or minute and use the arrows, or just type.
 
 | Step | What you can set | Default |
 |---|---|---|
-| **Bedtimes** | Bedtime and unlock time for each night. Untick nights to leave them free. | Every night, 00:00 to 06:00 |
+| **Bedtimes** | Bedtime and unlock time for each night. Untick nights to leave them free. Use the **Set several nights at once** box to give every night, school nights or weekend nights the same times in one click. Each row shows which hours get locked. | Every night, 00:00 to 06:00 |
 | **Warnings** | Up to 6 popups: how many minutes before, the message, sound on or off | 30 and 5 minutes before |
 | **At bedtime** | Shutdown, Sleep, Hibernate, Lock or Sign out. Countdown length, how often it repeats, night mode length, end date. | Shutdown, 60 s countdown, repeats every 5 min |
+| **Game and screen time** | Daily game and screen time budgets (weekdays and weekends), warnings, what happens when time runs out, which programs count as games | Off (1 h games / 4 h screen on weekdays, 2 h / 6 h at weekends when you turn it on) |
 | **Block sites and apps** | Websites, apps or whole folders to block, and when | Off (a social media list is ready to go) |
 | **Trusted person** | Turn on the code lock | Off |
-| **Game and screen time** | Daily game and screen time budgets (weekdays and weekends), warnings, what happens when time runs out, which programs count as games | Off (1 h games / 4 h screen on weekdays, 2 h / 6 h at weekends when you turn it on) |
 
 **How nights are named:** after the evening they start. A bedtime before 12:00 counts as *after midnight*, so "Mon 00:30" means 12:30 AM, early Tuesday.
 
