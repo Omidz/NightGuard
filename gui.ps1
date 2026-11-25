@@ -285,12 +285,17 @@ function Update-Welcome {
     $cfg = Get-NGConfig
     $installed = [bool]$cfg
     if ($installed) {
-        $lblWelcomeTitle.Text = 'Welcome back, night owl!'
+        $lblWelcomeTitle.Text = 'NightGuard is already on duty'
         $next = $null; try { $next = Get-NGNextNight $cfg } catch { }
         $nextTxt = if ($next) { '{0} {1} until {2} {3}' -f $next.Start.ToString('dddd'), $next.Start.ToString($TimeFmt), $next.End.ToString('dddd'), $next.End.ToString($TimeFmt) } else { 'none scheduled' }
-        $lblWelcome.Text = "NightGuard is installed and guarding your nights.`n`nNext locked night: $nextTxt`n`n" +
-            "Want to change something? Go through the steps (or jump straight to one on the left), then save on the last page.`n`n" +
-            "Curious what it's been up to? Click Status and log at the bottom left."
+        $end = Get-NGEndDate $cfg
+        $endTxt = if ($end) { "Last night: $($end.ToString('dddd d MMMM yyyy')). After that, NightGuard removes itself. It can't be uninstalled before then." } else { 'No end date: it runs until you uninstall it (after a 7-day cool-off).' }
+        $lockTxt = if (Get-NGTrusted) { "Trusted-person mode is on: changes and uninstall need your trusted person's code." } else { Format-NGUnlockText }
+        $lblWelcome.Text = "It's already installed and guarding your nights. No take-backs: that's the point.`n`n" +
+            "Next locked night: $nextTxt`n$endTxt`n`n$lockTxt`n`n" +
+            "You can always make it STRICTER (earlier bedtime, more blocking, less game time) and save right away. " +
+            "Making it LOOSER works like quitting anything else: you ask, wait 7 days, and then decide with a clear head.`n`n" +
+            "Status and log, and the uninstall request, are at the bottom left."
     } else {
         $lblWelcomeTitle.Text = 'Hi there, night owl!'
         $lblWelcome.Text = $WelcomeNew
@@ -298,6 +303,8 @@ function Update-Welcome {
     $btnSave.Text = if ($installed) { 'Save and apply' } else { 'Install NightGuard' }
     $bStatus.Enabled = $installed
     $bUninst.Enabled = $installed
+    $bUninst.Text = if (-not $installed -or (Get-NGTrusted)) { 'Uninstall...' } else {
+        switch ((Get-NGUnlock).State) { 'Open' { 'Uninstall...' } 'Waiting' { 'Cool-off running...' } default { 'Request uninstall...' } } }
     Update-TrustTab
 }
 
@@ -319,6 +326,7 @@ function Get-StatusText {
     $blk = Get-NGBlockedReason $cfg
     & $add ("Night mode      : {0}" -f $(if ($blk) { 'ON, settings and uninstall are locked right now' } else { "off (starts $($cfg.NightModeMinutes) min before bedtime)" }))
     $t = Get-NGTrusted
+    & $add ("Self-lock       : {0}" -f $(if (Get-NGTrusted) { 'trusted-person code skips the cool-off' } else { Format-NGUnlockText }))
     & $add ("Trusted person  : {0}" -f $(if ($t) { "ON, changes need the code" + $(if ($t.Contact) { " ($($t.Contact))" } else { '' }) } else { 'off' }))
     if ($cfg.Blocking.Enabled) {
         $now = if (Test-NGBlockActive $cfg) { 'BLOCKING NOW' } else { 'not right now' }
@@ -517,7 +525,7 @@ $chkEnd = New-Ctl 'CheckBox' $tAct @{ Text = 'Stop after an end date (last locke
 $dtpEnd = New-Ctl 'DateTimePicker' $tAct @{ Location = (P 320 240); Size = (S 160 24); Format = 'Custom'; CustomFormat = 'ddd yyyy-MM-dd'; Enabled = $false }
 $chkEnd.Add_CheckedChanged({ $dtpEnd.Enabled = $chkEnd.Checked })
 New-Ctl 'Label' $tAct @{ Location = (P 10 272); Size = (S 820 40); ForeColor = [System.Drawing.Color]::DimGray
-    Text = 'Trying it out for a month? After that night, NightGuard removes itself completely (tasks, blocks and files).' } | Out-Null
+    Text = "Trying it out for a month? After that night, NightGuard removes itself completely (tasks, blocks and files). Heads up: with an end date it can't be uninstalled before it, and the date can't be moved earlier." } | Out-Null
 
 # ---------------------------------------------------------------- Blocking tab
 $chkBlock = New-Ctl 'CheckBox' $tBlock @{ Text = 'Turn on site and app blocking (goodbye, 1 AM doomscrolling)'; Location = (P 10 10); Size = (S 450 24); Font = $FontBold }
@@ -712,7 +720,7 @@ $bUsage.Add_Click({ Safe { $c = Get-NGConfig; $lblUsage.Text = $(if ($c) { Get-N
 # ---------------------------------------------------------------- Review page
 New-Ctl 'Label' $tReview @{ Text = 'Last stop: review and install'; Location = (P 16 12); Size = (S 600 30); Font = $FontBig } | Out-Null
 New-Ctl 'Label' $tReview @{ Location = (P 16 46); Size = (S 890 24); Font = $FontRow
-    Text = "Here's everything NightGuard will do. Anything look off? Go back and fix it. All good? Tick the box below." } | Out-Null
+    Text = "Check it twice: once installed, stricter changes are instant, but looser ones and uninstalling need a 7-day cool-off." } | Out-Null
 $txtReview = New-Ctl 'TextBox' $tReview @{ Location = (P 16 78); Size = (S 895 450); Multiline = $true; ReadOnly = $true; ScrollBars = 'Vertical'
     Font = (New-Object System.Drawing.Font('Consolas', 10.5)); BackColor = [System.Drawing.Color]::White }
 $chkCorrect = New-Ctl 'CheckBox' $tReview @{ Text = 'Yes, these settings are correct.'; Location = (P 16 540); Size = (S 890 30); Font = $FontRowB }
@@ -945,6 +953,40 @@ function Confirm-Hibernate {
     else { Msg "Windows wouldn't turn hibernate on (some PCs don't support it). At bedtime NightGuard will shut down instead." 'Warning' }
 }
 
+# Self-lock check before saving. Returns $true when saving may go ahead.
+function Test-LooserOk($Cfg) {
+    $current = Get-NGConfig
+    if (-not $current -or (Get-NGTrusted)) { return $true }   # first install, or the code was checked
+    $looser = @(Get-NGLoosening $current $Cfg)
+    if ($looser.Count -eq 0) { return $true }
+    $list = "`n  - " + ($looser -join "`n  - ")
+    if ((Get-NGEndDate $current) -and ($looser -contains 'earlier end date')) {
+        Msg "The end date can't be moved earlier. NightGuard is locked in until $($current.EndDate). That was the deal." 'Warning'
+        return $false
+    }
+    $u = Get-NGUnlock
+    switch ($u.State) {
+        'Open' {
+            return (Confirm-Sure ("These changes make NightGuard looser:$list`n`nYour cool-off is over, so this is allowed. It uses up your unlock.`n`nARE YOU SURE?"))
+        }
+        'Waiting' {
+            Msg ("These changes make NightGuard looser:$list`n`nYour cool-off ends {0:dddd d MMM, HH:mm}. Until then you can only make things stricter. Undo the looser changes (Discard changes, bottom left), or come back then." -f $u.OpensAt) 'Warning'
+            return $false
+        }
+        default {
+            $q = "These changes make NightGuard looser:$list`n`nNightGuard is a commitment, so loosening it needs a 7-day cool-off. If you still want it in 7 days, you'll have 3 days to make looser changes (or uninstall).`n`n" +
+                 "Request an unlock now? You can cancel it anytime.`n`n(Stricter changes save right away. Undo the looser ones if that's all you need.)"
+            if (Confirm-Ask $q) { Request-NGUnlock; Update-Welcome; Msg (Format-NGUnlockText) }
+            return $false
+        }
+    }
+}
+
+# The final "are you sure", with No as the default button
+function Confirm-Sure([string]$Text) {
+    return ([System.Windows.Forms.MessageBox]::Show($script:form, $Text, 'NightGuard - are you sure?', 'YesNo', 'Warning', 'Button2') -eq 'Yes')
+}
+
 # ============================================================================
 # Buttons
 # ============================================================================
@@ -956,6 +998,7 @@ $btnSave.Add_Click({ Safe {
     $blk = Get-NGBlockedReason (Get-NGConfig); if ($blk) { throw $blk }
     $code = Get-CodeIfNeeded 'Saving changes needs the code.'
     if ($null -eq $code) { return }
+    if (-not (Test-LooserOk $cfg)) { return }
     $wantTrust = $chkTrust.Checked -and -not (Get-NGTrusted)
     $trustName = $txtContact.Text.Trim()
     if ($cfg.Action -eq 'Hibernate') { Confirm-Hibernate }
@@ -1004,10 +1047,27 @@ foreach ($wb in $warnPrev) {
 }
 
 $bUninst.Add_Click({ Safe {
-    $blk = Get-NGBlockedReason (Get-NGConfig); if ($blk) { throw $blk }
-    if (-not (Confirm-Ask 'Really remove NightGuard? This removes its tasks, blocks and files.')) { return }
+    $cfg = Get-NGConfig
+    $blk = Get-NGBlockedReason $cfg; if ($blk) { throw $blk }
+    if (-not (Get-NGTrusted)) {
+        # Self-lock: no end date + finished 7-day cool-off, or no uninstall
+        $why = Get-NGUninstallBlock $cfg
+        if ($why) {
+            $u = Get-NGUnlock
+            if (Get-NGEndDate $cfg) { Msg $why }
+            elseif ($u.State -eq 'Waiting') {
+                if (Confirm-Ask ("$why`n`nChanged your mind? Cancel the request?")) { Clear-NGUnlock; Msg 'Request cancelled. Future you is proud.' }
+            } else {
+                $q = "NightGuard is locked in. That's what makes it work.`n`nYou can request to uninstall. A 7-day cool-off starts now; after it you have 3 days to uninstall. You can cancel the request anytime.`n`nRequest to uninstall?"
+                if (Confirm-Ask $q) { Request-NGUnlock; Msg (Format-NGUnlockText) }
+            }
+            Update-Welcome
+            return
+        }
+    }
     $code = Get-CodeIfNeeded 'Uninstalling needs the code.'
     if ($null -eq $code) { return }
+    if (-not (Confirm-Sure "ARE YOU SURE you want to uninstall NightGuard?`n`nThis removes its tasks, blocks and files. If it's late and you just want one more game, click No and go to bed.")) { return }
     & (Join-Path $PSScriptRoot 'uninstall.ps1') -Code $code -NoPause -ThrowOnError | Out-Null
     Msg 'NightGuard has been removed. Go to bed anyway. ;)'
     $form.Close()

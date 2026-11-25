@@ -777,6 +777,139 @@ function Assert-NGCode([string]$Code) {
 }
 
 # ============================================================================
+# Self-lock: NightGuard treats itself like a commitment, not a setting.
+#  - Making the rules STRICTER is always allowed (outside night mode).
+#  - Making them LOOSER, or uninstalling, needs an unlock request and a
+#    7-day cool-off. After that the unlock stays open for 3 days, and it is
+#    used up by the first loosening save or uninstall.
+#  - With an end date, uninstall is not possible before it (NightGuard removes
+#    itself after the last night), and the end date can't be moved earlier.
+#  - The trusted person's code skips all of this.
+#  - A Windows admin can still remove NightGuard by hand (see the README).
+# ============================================================================
+$NGUnlockFile    = Join-Path $NGDir 'unlock.json'
+$NGCoolOffDays   = 7
+$NGUnlockOpenDays = 3
+
+function Get-NGUnlock {
+    $none = [pscustomobject]@{ State = 'None'; RequestedAt = $null; OpensAt = $null; ClosesAt = $null }
+    if (-not (Test-Path $NGUnlockFile)) { return $none }
+    try {
+        $u = Get-Content $NGUnlockFile -Raw | ConvertFrom-Json
+        $req = if ($u.RequestedAt -is [datetime]) { $u.RequestedAt } else { [datetime]::ParseExact([string]$u.RequestedAt, 's', $NGInv) }
+    } catch { return $none }
+    $now = Get-Date
+    if ($req -gt $now.AddDays(1)) { return $none }   # requested "in the future": clock was changed, ignore it
+    $opens = $req.AddDays($NGCoolOffDays); $closes = $opens.AddDays($NGUnlockOpenDays)
+    $state = if ($now -lt $opens) { 'Waiting' } elseif ($now -lt $closes) { 'Open' } else { 'None' }
+    return [pscustomobject]@{ State = $state; RequestedAt = $req; OpensAt = $opens; ClosesAt = $closes }
+}
+
+function Request-NGUnlock {
+    if ((Get-NGUnlock).State -ne 'None') { return }
+    Set-Content -Path $NGUnlockFile -Value (@{ RequestedAt = (Get-Date).ToString('s') } | ConvertTo-Json) -Encoding UTF8
+    Protect-NGFile $NGUnlockFile
+    Write-NGLog "unlock requested; cool-off ends $((Get-Date).AddDays($NGCoolOffDays).ToString('yyyy-MM-dd HH:mm'))"
+}
+
+function Clear-NGUnlock([string]$Why = 'cancelled') {
+    if (Test-Path $NGUnlockFile) {
+        Remove-Item $NGUnlockFile -Force -ErrorAction SilentlyContinue
+        Write-NGLog "unlock request $Why"
+    }
+}
+
+function Format-NGUnlockText {
+    $u = Get-NGUnlock
+    switch ($u.State) {
+        'Waiting' { return ('Unlock requested. Cool-off ends {0:dddd d MMM, HH:mm}.' -f $u.OpensAt) }
+        'Open'    { return ('Unlocked until {0:dddd d MMM, HH:mm}. Looser settings or uninstall are allowed once.' -f $u.ClosesAt) }
+        default   { return 'Locked in. Stricter changes are fine anytime; looser ones need an unlock request (7-day cool-off).' }
+    }
+}
+
+# How strong each bedtime / screen time action is (higher = stricter)
+$NGActionRank = @{ Shutdown = 3; Hibernate = 3; SignOut = 2; Sleep = 2; Lock = 1 }
+$NGSTActionRank = @{ Shutdown = 3; Lock = 2; Warn = 1 }
+
+# Lists every way $New is looser than $Old. Empty = same or stricter.
+function Get-NGLoosening($Old, $New) {
+    $out = @()
+    if (-not $Old -or -not $New) { return $out }
+    foreach ($d in $NGDays) {
+        $o = $Old.Schedule.$d; $n = $New.Schedule.$d
+        if (-not $o.Enabled) { continue }
+        if (-not $n.Enabled) { $out += "$d night is no longer locked"; continue }
+        $span = {
+            param($s)
+            $b = [timespan]::Parse([string]$s.Bedtime).TotalMinutes; $u = [timespan]::Parse([string]$s.Unlock).TotalMinutes
+            $start = if ($b -lt 720) { $b + 1440 } else { $b }
+            @($start, ($u + 1440))
+        }
+        $oSpan = & $span $o; $nSpan = & $span $n
+        if ($nSpan[0] -gt $oSpan[0]) { $out += "$d night: later bedtime" }
+        if ($nSpan[1] -lt $oSpan[1]) { $out += "$d night: earlier unlock" }
+    }
+    if ($NGActionRank[[string]$New.Action] -lt $NGActionRank[[string]$Old.Action]) { $out += "bedtime action: $($Old.Action) to $($New.Action)" }
+    if ([int]$New.CountdownSeconds -gt [int]$Old.CountdownSeconds) { $out += 'longer countdown' }
+    if ([int]$New.RecheckMinutes -gt [int]$Old.RecheckMinutes) { $out += 'repeats less often at night' }
+    if ([int]$New.NightModeMinutes -lt [int]$Old.NightModeMinutes) { $out += 'shorter night mode' }
+    $oe = Get-NGEndDate $Old; $ne = Get-NGEndDate $New
+    if ($ne -and (-not $oe -or $ne -lt $oe)) { $out += $(if ($oe) { 'earlier end date' } else { 'new end date' }) }
+
+    $ob = $Old.Blocking; $nb = $New.Blocking
+    if ($ob.Enabled) {
+        if (-not $nb.Enabled) { $out += 'blocking turned off' }
+        else {
+            if ($ob.DuringBedtime -and -not $nb.DuringBedtime) { $out += 'no blocking during bedtime' }
+            $gone = @($ob.Sites | Where-Object { @($nb.Sites) -notcontains $_ })
+            if ($gone.Count) { $out += "sites unblocked: $($gone -join ', ')" }
+            $gone = @($ob.Apps | Where-Object { @($nb.Apps) -notcontains $_ })
+            if ($gone.Count) { $out += "apps unblocked: $($gone -join ', ')" }
+            $key = { param($w) '{0}|{1}|{2}' -f (@($w.Days) -join ','), $w.From, $w.To }
+            $nk = @($nb.Windows | ForEach-Object { & $key $_ })
+            if (@($ob.Windows | Where-Object { $nk -notcontains (& $key $_) }).Count) { $out += 'blocking time slots changed or removed' }
+        }
+    }
+
+    $os = $Old.ScreenTime; $ns = $New.ScreenTime
+    if ($os.Enabled) {
+        if (-not $ns.Enabled) { $out += 'screen time limits turned off' }
+        else {
+            $names = [ordered]@{ GameMinutesWeekday = 'game time on weekdays'; GameMinutesWeekend = 'game time at weekends'
+                                 ScreenMinutesWeekday = 'screen time on weekdays'; ScreenMinutesWeekend = 'screen time at weekends' }
+            foreach ($f in $names.Keys) {
+                $o = [int]$os.$f; $n = [int]$ns.$f
+                if ($o -gt 0 -and ($n -eq 0 -or $n -gt $o)) { $out += "more $($names[$f])" }
+            }
+            if ($NGSTActionRank[[string]$ns.LimitAction] -lt $NGSTActionRank[[string]$os.LimitAction]) { $out += "screen time action: $($os.LimitAction) to $($ns.LimitAction)" }
+            if ([int]$ns.ResetHour -ne [int]$os.ResetHour) { $out += 'different day reset hour' }
+            if ([int]$ns.ShutdownGraceMinutes -gt [int]$os.ShutdownGraceMinutes) { $out += 'longer shutdown notice' }
+            if ($os.CloseLaunchers -and -not $ns.CloseLaunchers) { $out += 'launchers no longer closed' }
+            foreach ($f in 'GameFolders', 'GameProcesses', 'LauncherProcesses') {
+                $nl = @($ns.$f | ForEach-Object { "$_".ToLowerInvariant() })
+                if (@($os.$f | Where-Object { $nl -notcontains "$_".ToLowerInvariant() }).Count) { $out += "removed from $f" }
+            }
+            $ol = @($os.IgnoreProcesses | ForEach-Object { "$_".ToLowerInvariant() })
+            if (@($ns.IgnoreProcesses | Where-Object { $ol -notcontains "$_".ToLowerInvariant() }).Count) { $out += 'more programs ignored by screen time' }
+        }
+    }
+    return $out
+}
+
+# Why uninstalling isn't allowed right now (ignoring the trusted-person code), or $null if it is.
+function Get-NGUninstallBlock($Cfg) {
+    if (-not $Cfg) { return $null }   # damaged or missing settings: never trap anyone
+    $end = Get-NGEndDate $Cfg
+    if ($end) { return ("NightGuard is locked in until its last night, {0:dddd d MMMM yyyy}. After that it removes itself." -f $end) }
+    switch ((Get-NGUnlock).State) {
+        'Open'    { return $null }
+        'Waiting' { return ('You asked to uninstall. The 7-day cool-off ends {0:dddd d MMM, HH:mm}. Still want out then? Come back.' -f (Get-NGUnlock).OpensAt) }
+        default   { return 'NightGuard is locked in. To uninstall, request an unlock in the NightGuard app. After a 7-day cool-off you can uninstall.' }
+    }
+}
+
+# ============================================================================
 # Removal. Only removes what NightGuard created.
 # ============================================================================
 function Remove-NightGuard {
