@@ -221,18 +221,27 @@ try {
     # --- Start Menu shortcuts ---------------------------------------------------
     try {
         $wsh = New-Object -ComObject WScript.Shell
-        $lnk = $wsh.CreateShortcut($NGShortcut)
-        $lnk.TargetPath = $ps
-        $lnk.Arguments  = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$NGDir\gui.ps1`""
-        $lnk.WorkingDirectory = $NGDir
-        $lnk.Description = 'NightGuard'
-        $lnk.Save()
-        $lnk = $wsh.CreateShortcut($NGShortcut2)
-        $lnk.TargetPath = $ps
-        $lnk.Arguments  = "-NoProfile -ExecutionPolicy Bypass -File `"$NGDir\menu.ps1`""
-        $lnk.WorkingDirectory = $NGDir
-        $lnk.Description = 'NightGuard (text menu)'
-        $lnk.Save()
+        # All shortcuts point at the installed copy, never at the downloaded folder
+        Remove-Item -Path $NGShortcut, $NGShortcut2, $NGShortcutDesk -Force -ErrorAction SilentlyContinue
+        $places = @()
+        if ($cfg.ShortcutStartMenu -ne $false) { $places += $NGShortcut }
+        if ($cfg.ShortcutDesktop) { $places += $NGShortcutDesk }
+        foreach ($path in $places) {
+            $lnk = $wsh.CreateShortcut($path)
+            $lnk.TargetPath = $ps
+            $lnk.Arguments  = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$NGDir\gui.ps1`""
+            $lnk.WorkingDirectory = $NGDir
+            $lnk.Description = 'NightGuard'
+            $lnk.Save()
+        }
+        if ($cfg.ShortcutStartMenu -ne $false) {
+            $lnk = $wsh.CreateShortcut($NGShortcut2)
+            $lnk.TargetPath = $ps
+            $lnk.Arguments  = "-NoProfile -ExecutionPolicy Bypass -File `"$NGDir\menu.ps1`""
+            $lnk.WorkingDirectory = $NGDir
+            $lnk.Description = 'NightGuard (text menu)'
+            $lnk.Save()
+        }
     } catch { }
 
     Write-Host ''

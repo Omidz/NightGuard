@@ -54,9 +54,19 @@ $streakTxt = switch ($report.Streak) {
     default { "$(E 0x1F525) $($report.Streak) clean nights in a row!" + $(if ($report.Streak -ge 7) { ' That is a habit now.' } else { '' }) }
 }
 
+# New badge earned last night?
+$badge = $null
+# (only the first time you reach it: the streak is at a milestone and is your best ever)
+if ($report.Kind -eq 'Clean' -and $report.Streak -eq $report.Best) { $badge = $NGBadges | Where-Object { $_.Nights -eq $report.Streak } | Select-Object -First 1 }
+if ($badge) { $title = "New badge: $($badge.Name)!"; $body = "$($badge.Line)`n$body" }
+$next = Get-NGNextBadge ([math]::Max($report.Best, $report.Streak))
+if ($next) { $streakTxt += "  Next badge: $($next.Name) at $($next.Nights)." }
+$whyTxt = if ($cfg.Why) { 'Remember why you started: ' + [char]0x201C + [string]$cfg.Why + [char]0x201D } else { '' }
+$shift = if ($whyTxt) { 50 } else { 0 }
+
 $FontRow = New-Object System.Drawing.Font('Segoe UI', 10)
 $form = New-Object System.Windows.Forms.Form
-$form.Text = 'NightGuard - morning check-in'; $form.Size = New-Object System.Drawing.Size(560, 470)
+$form.Text = 'NightGuard - morning check-in'; $form.Size = New-Object System.Drawing.Size(560, (470 + $shift))
 $form.StartPosition = 'CenterScreen'; $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.MinimizeBox = $false
 $form.TopMost = $true; $form.BackColor = [System.Drawing.Color]::White; $form.Font = $FontRow
 
@@ -73,16 +83,18 @@ $t = New-Object System.Windows.Forms.Label
 $t.Text = $title; $t.Location = (P 18 16); $t.Size = (S 520 34); $t.ForeColor = [System.Drawing.Color]::White
 $t.Font = New-Object System.Drawing.Font('Segoe UI', 16, [System.Drawing.FontStyle]::Bold)
 [void]$hdr.Controls.Add($t)
-Add-Ctl 'Label' @{ Text = $body; Location = (P 18 76); Size = (S 520 48) } | Out-Null
-Add-Ctl 'Label' @{ Text = $streakTxt; Location = (P 18 128); Size = (S 520 26); Font = (New-Object System.Drawing.Font('Segoe UI', 11, [System.Drawing.FontStyle]::Bold))
+Add-Ctl 'Label' @{ Text = $body; Location = (P 18 72); Size = (S 520 54) } | Out-Null
+if ($whyTxt) { Add-Ctl 'Label' @{ Text = $whyTxt; Location = (P 18 162); Size = (S 520 46); ForeColor = [System.Drawing.Color]::FromArgb(40, 50, 120)
+    Font = (New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Italic)) } | Out-Null }
+Add-Ctl 'Label' @{ Text = $streakTxt; Location = (P 18 128); Size = (S 520 30); Font = (New-Object System.Drawing.Font('Segoe UI', 11, [System.Drawing.FontStyle]::Bold))
     ForeColor = [System.Drawing.Color]::FromArgb(190, 90, 0) } | Out-Null
 
-Add-Ctl 'Label' @{ Text = 'How are you feeling this morning? (optional)'; Location = (P 18 170); Size = (S 520 22); Font = (New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)) } | Out-Null
+Add-Ctl 'Label' @{ Text = 'How are you feeling this morning? (optional)'; Location = (P 18 (170 + $shift)); Size = (S 520 22); Font = (New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)) } | Out-Null
 $faces = @{ 1 = 0x1F62B; 2 = 0x1F615; 3 = 0x1F610; 4 = 0x1F642; 5 = 0x1F601 }
 $script:mood = 0
 $moodBtns = @()
 for ($m = 1; $m -le 5; $m++) {
-    $b = Add-Ctl 'Button' @{ Text = "$(E $faces[$m])`n$($NGMoodNames[$m])"; Location = (P (18 + ($m - 1) * 102) 196); Size = (S 94 62); Tag = $m
+    $b = Add-Ctl 'Button' @{ Text = "$(E $faces[$m])`n$($NGMoodNames[$m])"; Location = (P (18 + ($m - 1) * 102) (196 + $shift)); Size = (S 94 62); Tag = $m
         Font = (New-Object System.Drawing.Font('Segoe UI Emoji', 10)); FlatStyle = 'Flat'; BackColor = [System.Drawing.Color]::White }
     $moodBtns += $b
 }
@@ -92,10 +104,10 @@ foreach ($b in $moodBtns) {
         foreach ($x in $moodBtns) { $x.BackColor = $(if ([int]$x.Tag -eq $script:mood) { [System.Drawing.Color]::FromArgb(200, 215, 255) } else { [System.Drawing.Color]::White }) }
     })
 }
-Add-Ctl 'Label' @{ Text = 'A short note for future you (optional, stays on this PC):'; Location = (P 18 270); Size = (S 520 22) } | Out-Null
-$note = Add-Ctl 'TextBox' @{ Location = (P 18 294); Size = (S 510 56); Multiline = $true; MaxLength = 280 }
-$save = Add-Ctl 'Button' @{ Text = 'Save to my journal'; Location = (P 268 370); Size = (S 160 36); Font = (New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)); DialogResult = 'OK' }
-$skip = Add-Ctl 'Button' @{ Text = 'Skip'; Location = (P 438 370); Size = (S 90 36); DialogResult = 'Cancel' }
+Add-Ctl 'Label' @{ Text = 'A short note for future you (optional, stays on this PC):'; Location = (P 18 (270 + $shift)); Size = (S 520 22) } | Out-Null
+$note = Add-Ctl 'TextBox' @{ Location = (P 18 (294 + $shift)); Size = (S 510 56); Multiline = $true; MaxLength = 280 }
+$save = Add-Ctl 'Button' @{ Text = 'Save to my journal'; Location = (P 268 (370 + $shift)); Size = (S 160 36); Font = (New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)); DialogResult = 'OK' }
+$skip = Add-Ctl 'Button' @{ Text = 'Skip'; Location = (P 438 (370 + $shift)); Size = (S 90 36); DialogResult = 'Cancel' }
 $form.CancelButton = $skip
 
 # Close by itself after 10 minutes if nobody's there
@@ -111,6 +123,7 @@ if ($r -eq 'OK' -and ($script:mood -gt 0 -or $note.Text.Trim())) {
         Add-NGJournalEntry ([pscustomobject]@{
             Date = (Get-Date).ToString('yyyy-MM-dd'); Time = (Get-Date).ToString('HH:mm')
             Mood = $script:mood; Note = $note.Text.Trim(); LastNight = $report.Kind; Streak = $report.Streak
+            Badge = $(if ($badge) { $badge.Name } else { '' })
         })
     } catch { }
 }

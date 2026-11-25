@@ -19,7 +19,9 @@ NightGuard warns you before bedtime, then **powers your PC off** (hibernate by d
 - 🚫 **Blocks distractions on a schedule** (optional). Social media sites and apps like Discord or Steam, during bedtime or during your focus hours.
 - 🔐 **Trusted-person mode** (optional). A friend or parent types in their own secret 8-digit code. Without it, you can't change settings or uninstall. No more "I'll just disable it tonight".
 - 🌘 **Night mode.** In the last hour before bedtime, settings are locked. Past-you made a decision. Present-you doesn't get a vote.
-- ☀️ **Morning check-in.** A little cheer for last night, your streak of clean nights, and an optional mood + note for your private journal. Recovery is a streak game.
+- ☀️ **Morning check-in.** A little cheer for last night, your streak of clean nights, **badges from night 1 to a full year**, and an optional mood + note for your private journal. Recovery is a streak game.
+- 💬 **Your why.** Write down why you started. NightGuard throws it back at you in the final warning, right when you need it.
+- 🎯 **Gets through to you mid-game.** Warnings and the countdown force themselves on top, with a sound and a Windows notification as backup.
 - 🏁 **End date** (optional). Do a 30-day challenge and NightGuard removes itself afterwards.
 
 ---
@@ -30,16 +32,16 @@ NightGuard warns you before bedtime, then **powers your PC off** (hibernate by d
 2. **Unblock it** so Windows doesn't nag: right-click the zip > **Properties** > tick **Unblock** at the bottom > **OK**. (No Unblock box? Fine, skip it.)
 3. **Unzip** it anywhere, for example your Downloads folder.
 4. **Double-click `NightGuard.cmd`** and click **Yes** on the admin prompt. (Blue "Windows protected your PC" screen? Click **More info** > **Run anyway**. More fixes in the SmartScreen section just below.)
-5. **Walk through the wizard.** Pick your bedtimes, warnings and what happens at bedtime. The defaults are sensible, so **Next, Next, Next** is totally fine.
-6. **Install.** On the last step, read the summary, tick **Yes, these settings are correct**, and click **Install NightGuard**. Done!
+5. **Walk through the wizard.** Pick your bedtimes, warnings and what happens at bedtime. The defaults are sensible, so **Next, Next, Next** is totally fine. One thing we *strongly* recommend: write your **why** on the "Your why and journal" step.
+6. **Install.** On the last step, read the summary, pick where you want shortcuts (Start Menu, Desktop), tick **Yes, these settings are correct**, and click **Install NightGuard**. Done!
 
-Later, open NightGuard from **Start Menu > NightGuard**. You can delete the downloaded folder: NightGuard keeps its own copy.
+**You can delete the downloaded folder now.** NightGuard installs its own copy into `C:\ProgramData\NightGuard` (a protected folder, like Program Files) and runs only from there. Open it again from the **Start Menu** or **Desktop** shortcut. Want it on the taskbar? Right-click NightGuard in the Start Menu > **Pin to taskbar** (Windows doesn't let apps pin themselves).
 
 Needs Windows 10 or 11. Nothing else to install: it uses the PowerShell that's already on every Windows PC.
 
 ### 🌙 What happens tonight
 
-- **30 and 5 minutes before bedtime:** a popup (with a sound) tells you to wrap up and save.
+- **30 and 5 minutes before bedtime:** a popup (with a sound) jumps in front of whatever you're doing and tells you to wrap up and save. The last one reminds you why you started.
 - **At bedtime:** a 60-second countdown, then the PC hibernates. Your open stuff is saved to disk, usually.
 - **Switch it back on before unlock time?** About a minute later: countdown, hibernate. Repeat until you give up and sleep. 😴
 - **After unlock time:** your PC is back to normal, and your apps are where you left them.
@@ -88,10 +90,12 @@ Times are shown the same way as your Windows clock: 12-hour with AM/PM, or 24-ho
 |---|---|---|
 | **Bedtimes** | Bedtime and unlock time for each night. Untick nights to leave them free. Use the **Set several nights at once** box to give every night, school nights or weekend nights the same times in one click. Each row shows which hours get locked. | Every night, 00:00 to 06:00 |
 | **Warnings** | Up to 6 popups: how many minutes before, the message, sound on or off. **Preview** any popup, or the bedtime countdown, right there. | 30 and 5 minutes before |
-| **At bedtime** | Hibernate, Shutdown, Sleep, Lock or Sign out. Countdown length, how often it repeats, night mode length, end date, morning check-in on or off. | Hibernate, 60 s countdown, repeats every minute, check-in on |
+| **At bedtime** | Hibernate, Shutdown, Sleep, Lock or Sign out. Countdown length, how often it repeats, night mode length, end date. | Hibernate, 60 s countdown, repeats every minute |
+| **Your why and journal** | Your reason, in your words (highly recommended). Morning check-in, streaks and badges on or off. | Check-in on |
 | **Game and screen time** | Daily game and screen time budgets (weekdays and weekends), warnings, what happens when time runs out, which programs count as games | Off (1 h games / 4 h screen on weekdays, 2 h / 6 h at weekends when you turn it on) |
 | **Block sites and apps** | Websites, apps or whole folders to block, and when | Off (a social media list is ready to go) |
 | **Trusted person** | Turn on the code lock. Your trusted person types their own code when you install or save. | Off |
+| **Review and install** | Check everything, pick shortcuts (Start Menu, Desktop), confirm, install. | Start Menu shortcut |
 
 **How nights are named:** after the evening they start. A bedtime before 12:00 counts as *after midnight*, so "Mon 00:30" means 12:30 AM, early Tuesday.
 
@@ -131,7 +135,17 @@ Quitting late nights works like quitting anything: small wins, counted. So on yo
 - **Your streak:** clean nights in a row. A *clean night* means you were off before bedtime and stayed off, so the bouncer never had to step in. Free nights don't break the streak.
 - **An optional mood (1 to 5) and a short note**, saved to your journal. Or click **Skip**. No guilt trips. Well, small ones.
 
-Read it all back under **My journal** (bottom left in the app): your entries, your streak and your average mood lately. **Save a copy...** exports it to a text file.
+### 🏅 Badges
+
+Clean nights in a row earn badges, all the way to a year: **First Light** (1), **Hat Trick** (3), **High Five** (5), **Week Warrior** (7), **Double Digits** (10), **Fortnight Knight** (14), **Habit Hacker** (21), **Moonwalker** (30), **Sandman's Apprentice** (45), **Dream Team** (60), **Pillow Pro** (75), **Quarter Master** (90), **Night Owl, Retired** (120), **Sleep Scholar** (150), **Half-Year Hero** (180), **Snooze Sage** (225), **Nine-Month Ninja** (270), **Three Hundred Club** (300), **Almost There** (330) and the big one, **Sleep Legend** (365). The morning check-in announces each new one.
+
+### 💬 Your why
+
+On the **Your why and journal** step, write one or two sentences about why you're doing this. Optional, but **highly recommended**: at 11:55 PM mid-game, "be healthier" is easy to ignore, while "I want to stop being a zombie at work" hits different. It shows up in the final warning, the bedtime countdown, your morning check-in and your journal. Change it any time (no cool-off needed).
+
+### 📓 My journal
+
+Read it all back under **My journal** (bottom left in the app): your why, your streak, badges earned and what's next, your entries and your average mood lately. **Save a copy...** exports it to a text file.
 
 Privacy: the journal stays on this PC, in a folder that only your Windows account (and the PC's administrators) can read. Nothing leaves the computer. It's deleted when NightGuard is uninstalled, so save a copy first if you want to keep it. Don't want the check-in? Untick **Morning check-in** on the At bedtime step (no cool-off needed for that one).
 
@@ -257,7 +271,7 @@ Something weird? [Open an issue](../../issues). Bug reports from fellow procrast
 | `blocker.ps1` | Turns site and app blocking on and off |
 | `tracker.ps1` | Counts game and screen time every minute |
 | `notify.ps1` | Screen time popups |
-| `checkin.ps1` | The morning check-in popup and journal |
+| `checkin.ps1` | The morning check-in popup, streaks, badges and journal |
 | `common.ps1` | Shared code. The top of the file documents every setting. |
 
 Settings are saved in `C:\ProgramData\NightGuard\config.json`, and there's a log in `log.txt` next to it.
@@ -283,6 +297,12 @@ Set your own bedtime and unlock time per night. Any time works, as long as there
 **Will it close my game without saving?**
 With Shutdown, yes, after the countdown. With Hibernate (the default) your game is usually still there when you switch the PC back on, but don't bet your save file on it. That's why there are warnings. Save at the 5-minute warning. 🙂
 
+**Will the warnings show up over my fullscreen game?**
+Almost always. Warnings and the countdown are always-on-top windows that pull themselves to the front (and keep doing it every second), play a sound, and also send a Windows notification as a backup. Most games today run in *borderless* fullscreen, where that works fine. A few older games use *exclusive* fullscreen, which nothing can draw over. There, grabbing focus usually knocks the game back to the desktop so you see the warning; if a game refuses, you'll still hear the sound. Either way, bedtime still happens on time. Tip: switch your game to borderless or windowed fullscreen to be sure.
+
+**Can I delete the folder I downloaded?**
+Yes. NightGuard copies itself to `C:\ProgramData\NightGuard` and runs only from there. The shortcuts point there too.
+
 **Will it slow down my PC or my games?**
 Nope. NightGuard isn't a program that sits in the background. Windows wakes a tiny script now and then (every minute for screen time or at night, every 5 minutes for blocking), it does its thing in a second or two, and it's gone again. No always-on background app, no meaningful memory use. Your FPS won't notice. Your sleep schedule will.
 
@@ -297,6 +317,13 @@ Ideas, bug fixes and translations are welcome. See [CONTRIBUTING.md](CONTRIBUTIN
 
 ## 📄 License
 
-[MIT](LICENSE). Free to use, change and share.
+NightGuard is **source-available** under the [PolyForm Strict License 1.0.0](LICENSE). In plain words:
+
+- ✅ **Free to use** for personal and other noncommercial use (people, schools, charities and so on). Read the code all you like.
+- 🚫 **No selling it, and no commercial use.**
+- 🚫 **No modified versions or redistributing it.** Share the link to this page instead.
+- 🤝 **Contributions welcome:** you may fork it only to send changes back here as a pull request (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+
+It's not "open source" in the OSI sense, on purpose: it stays free, and it stays Omid's.
 
 Now close this tab and go to sleep. 🌙

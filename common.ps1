@@ -11,6 +11,8 @@
 #   RecheckMinutes    How often the action repeats during the night (1-60)
 #   NightModeMinutes  Settings/uninstall are blocked from this many minutes before bedtime until unlock (0-240)
 #   EndDate           yyyy-MM-dd: last night that is locked. The lock removes itself after it. null = never.
+#   Why               Your reason, in your words (shown in the final warning, countdown and check-in)
+#   ShortcutStartMenu / ShortcutDesktop   Where to put shortcuts to the app
 #   MorningCheckIn    true/false: a cheerful popup on the first sign-in each day, with an optional mood + note journal
 #   Blocking          { Enabled, DuringBedtime, Sites[], Apps[], Windows[ {Days[], From, To} ] }
 #                     Sites are blocked in the hosts file, Apps (exe files or folders) with Windows Firewall.
@@ -36,6 +38,7 @@ $NGTaskPath  = "\$NGAppName\"
 $NGStartMenu = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs'
 $NGShortcut  = Join-Path $NGStartMenu "$NGAppName.lnk"
 $NGShortcut2 = Join-Path $NGStartMenu "$NGAppName (text menu).lnk"
+$NGShortcutDesk = Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) "$NGAppName.lnk"
 $NGDays      = @('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')
 $NGActions   = @('Shutdown', 'Sleep', 'Hibernate', 'Lock', 'SignOut')
 $NGActionWords = @{ Shutdown = 'shut down'; Sleep = 'go to sleep'; Hibernate = 'hibernate'; Lock = 'lock'; SignOut = 'sign you out' }
@@ -151,6 +154,9 @@ function New-NGDefaultConfig {
         NightModeMinutes = 60
         EndDate          = $null
         MorningCheckIn   = $true
+        Why              = ''
+        ShortcutStartMenu = $true
+        ShortcutDesktop  = $false
         Blocking         = New-NGDefaultBlocking
         ScreenTime       = New-NGDefaultScreenTime
     }
@@ -190,6 +196,9 @@ function ConvertTo-NGJson($Cfg) {
         NightModeMinutes = [int]$Cfg.NightModeMinutes
         EndDate          = $(if ($Cfg.EndDate) { [string]$Cfg.EndDate } else { $null })
         MorningCheckIn   = $(if ($null -eq $Cfg.MorningCheckIn) { $true } else { [bool]$Cfg.MorningCheckIn })
+        Why              = $(if ($Cfg.Why) { ([string]$Cfg.Why).Trim() } else { '' })
+        ShortcutStartMenu = $(if ($null -eq $Cfg.ShortcutStartMenu) { $true } else { [bool]$Cfg.ShortcutStartMenu })
+        ShortcutDesktop  = [bool]$Cfg.ShortcutDesktop
         Blocking         = [ordered]@{
             Enabled       = [bool]$b.Enabled
             DuringBedtime = [bool]$b.DuringBedtime
@@ -309,6 +318,8 @@ function Test-NGConfig($Cfg) {
         if ($s.Enabled) { $anyOn = $true }
     }
     if (-not $anyOn) { $errs += 'Every night is turned off. Turn on at least one night, or uninstall instead.' }
+    if ($Cfg.ShortcutStartMenu -eq $false -and -not $Cfg.ShortcutDesktop) { $errs += 'Keep at least one shortcut (Start Menu or Desktop), so you can open NightGuard later.' }
+    if (([string]$Cfg.Why).Length -gt 300) { $errs += '"Why I started" can be at most 300 characters.' }
     if ($errs.Count -eq 0) {
         $ref = [datetime]'2024-01-01'   # a Monday
         foreach ($i in 0..6) {
@@ -946,19 +957,19 @@ function Get-NGNightReport($Cfg, [datetime]$Now = (Get-Date)) {
     if (Get-NGCurrentNight $Cfg) { return $null }
     $since = Get-NGSince
     $stepped = @(); if (Test-Path $NGSteppedInFile) { $stepped = @(Get-Content $NGSteppedInFile) }
-    $streak = 0
-    for ($i = 1; $i -le 400; $i++) {
-        $eve = $Now.Date.AddDays(-$i)
-        if ($eve -lt $since) { break }
+    # Walk every night since install (oldest first): current run and best run of clean nights
+    $streak = 0; $best = 0
+    $first = $since; if (($Now.Date - $first).TotalDays -gt 800) { $first = $Now.Date.AddDays(-800) }
+    for ($eve = $first; $eve -lt $Now.Date; $eve = $eve.AddDays(1)) {
         $n = Get-NGNight $Cfg $eve -IgnoreEndDate
         if (-not $n -or $n.End -gt $Now) { continue }       # free night (doesn't break the streak)
-        if ($stepped -contains $eve.ToString('yyyy-MM-dd')) { break }
-        $streak++
+        if ($stepped -contains $eve.ToString('yyyy-MM-dd')) { $streak = 0 } else { $streak++ }
+        if ($streak -gt $best) { $best = $streak }
     }
     $y = $Now.Date.AddDays(-1)
     $last = Get-NGNight $Cfg $y -IgnoreEndDate
     $kind = if ($y -lt $since) { 'New' } elseif (-not $last) { 'Free' } elseif ($stepped -contains $y.ToString('yyyy-MM-dd')) { 'SteppedIn' } else { 'Clean' }
-    return [pscustomobject]@{ Kind = $kind; Streak = $streak }
+    return [pscustomobject]@{ Kind = $kind; Streak = $streak; Best = $best }
 }
 
 function Get-NGJournalFolder([switch]$Create) {
@@ -984,6 +995,102 @@ function Add-NGJournalEntry($Entry) {
 
 $NGMoodNames = @{ 1 = 'Rough'; 2 = 'Meh'; 3 = 'OK'; 4 = 'Good'; 5 = 'Great' }
 
+# ============================================================================
+# Popups that get through to someone in a game
+#  - Always-on-top window, pulled to the foreground (with the usual ALT-key trick,
+#    since Windows blocks background apps from stealing focus), re-asserted every
+#    second so a game can't bury it.
+#  - Taking focus also knocks most exclusive-fullscreen games back to the desktop.
+#  - A sound, plus a Windows notification as a backup.
+# ============================================================================
+function Initialize-NGWin32 {
+    if ('NGNative.NGWin32' -as [type]) { return }
+    Add-Type -Namespace 'NGNative' -Name 'NGWin32' -MemberDefinition @'
+[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+[DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+[DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+'@
+}
+
+# Puts a form on top of everything and gives it focus
+function Set-NGFront($Form, [switch]$NoActivate) {
+    try {
+        Initialize-NGWin32
+        $h = $Form.Handle
+        if ($NoActivate) {
+            [void][NGNative.NGWin32]::SetWindowPos($h, [IntPtr](-1), 0, 0, 0, 0, 0x0001 -bor 0x0002 -bor 0x0010)   # HWND_TOPMOST, no move/size/activate
+            return
+        }
+        [void][NGNative.NGWin32]::SetWindowPos($h, [IntPtr](-1), 0, 0, 0, 0, 0x0001 -bor 0x0002 -bor 0x0040)      # HWND_TOPMOST, show
+        if ([NGNative.NGWin32]::GetForegroundWindow() -ne $h) {
+            [NGNative.NGWin32]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [NGNative.NGWin32]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)   # tap ALT
+            [void][NGNative.NGWin32]::ShowWindow($h, 9)   # restore
+            [void][NGNative.NGWin32]::BringWindowToTop($h)
+            [void][NGNative.NGWin32]::SetForegroundWindow($h)
+        }
+    } catch { }
+}
+
+# Keeps a form on top while it's open: grabs focus for the first few seconds,
+# then keeps it above other windows every second without stealing typing.
+function Enable-NGStayOnTop($Form, [int]$GrabSeconds = 5) {
+    $Form.TopMost = $true
+    $t = New-Object System.Windows.Forms.Timer
+    $t.Interval = 1000
+    $t.Tag = @{ Form = $Form; Ticks = 0; Grab = $GrabSeconds }
+    $t.Add_Tick({
+        $st = $this.Tag; $st.Ticks++
+        if ($st.Ticks -le $st.Grab) { Set-NGFront $st.Form } else { Set-NGFront $st.Form -NoActivate }
+    })
+    $Form.Tag = $t
+    $Form.Add_Shown({ Set-NGFront $this; $this.Tag.Start() })
+    $Form.Add_FormClosed({ try { $this.Tag.Stop(); $this.Tag.Dispose() } catch { } })
+}
+
+# Backup: a Windows notification (shows even when a window can't get through; Focus Assist may hold it)
+function Show-NGToast([string]$Title, [string]$Text) {
+    try {
+        $null = [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
+        $null = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]
+        $esc = { param($s) [Security.SecurityElement]::Escape($s) }
+        $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
+        $xml.LoadXml("<toast scenario=`"reminder`"><visual><binding template=`"ToastGeneric`"><text>$(& $esc $Title)</text><text>$(& $esc $Text)</text></binding></visual><audio src=`"ms-winsoundevent:Notification.Looping.Alarm`"/><actions><action content=`"OK`" arguments=`"ok`"/></actions></toast>")
+        $appId = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
+        [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($appId).Show([Windows.UI.Notifications.ToastNotification]::new($xml))
+    } catch { }
+}
+
+# ============================================================================
+# Badges: streak milestones of clean nights, from night one to a full year
+# ============================================================================
+$NGBadges = @(
+    @{ Nights = 1;   Name = 'First Light';          Line = 'One clean night. Every legend starts somewhere.' }
+    @{ Nights = 3;   Name = 'Hat Trick';            Line = 'Three nights. Your pillow is starting to recognise you.' }
+    @{ Nights = 5;   Name = 'High Five';            Line = 'Five nights. Give yourself one. Then go to bed.' }
+    @{ Nights = 7;   Name = 'Week Warrior';         Line = 'A full week! Science says the habit is forming. We say: nice.' }
+    @{ Nights = 10;  Name = 'Double Digits';        Line = 'Ten nights. "One more game" is losing its grip.' }
+    @{ Nights = 14;  Name = 'Fortnight Knight';     Line = 'Two weeks. Your eye bags have filed a complaint about being ignored.' }
+    @{ Nights = 21;  Name = 'Habit Hacker';         Line = '21 nights. They say that is how long a habit takes. You did it.' }
+    @{ Nights = 30;  Name = 'Moonwalker';           Line = 'A whole month of real sleep. Who even are you?' }
+    @{ Nights = 45;  Name = 'Sandman''s Apprentice'; Line = '45 nights. The Sandman wants to hire you.' }
+    @{ Nights = 60;  Name = 'Dream Team';           Line = 'Two months. Your future self sends a thank-you card.' }
+    @{ Nights = 75;  Name = 'Pillow Pro';           Line = '75 nights. You and your pillow are officially a couple.' }
+    @{ Nights = 90;  Name = 'Quarter Master';       Line = 'Three months. A whole season of not seeing 3 AM.' }
+    @{ Nights = 120; Name = 'Night Owl, Retired';   Line = '120 nights. The owl has hung up its wings.' }
+    @{ Nights = 150; Name = 'Sleep Scholar';        Line = '150 nights. You could teach a class on this.' }
+    @{ Nights = 180; Name = 'Half-Year Hero';       Line = 'Six months! Half a year of choosing sleep.' }
+    @{ Nights = 225; Name = 'Snooze Sage';          Line = '225 nights. Monks come to you for advice now.' }
+    @{ Nights = 270; Name = 'Nine-Month Ninja';     Line = '270 nights. Silent, rested, unstoppable.' }
+    @{ Nights = 300; Name = 'Three Hundred Club';   Line = '300 nights. This is just who you are now.' }
+    @{ Nights = 330; Name = 'Almost There';         Line = '330 nights. The finish line can see you.' }
+    @{ Nights = 365; Name = 'Sleep Legend';         Line = 'ONE YEAR. A full trip around the sun, asleep on time. Absolute legend.' }
+)
+function Get-NGBadges([int]$Best) { @($NGBadges | Where-Object { $_.Nights -le $Best }) }
+function Get-NGNextBadge([int]$Best) { @($NGBadges | Where-Object { $_.Nights -gt $Best })[0] }
+
 function Remove-NightGuard {
     try { [void](Clear-NGBlocks) } catch { }
     Get-ScheduledTask -TaskPath $NGTaskPath -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
@@ -992,7 +1099,7 @@ function Remove-NightGuard {
         $svc.Connect()
         $svc.GetFolder('\').DeleteFolder($NGAppName, 0)
     } catch { }
-    Remove-Item -Path $NGShortcut, $NGShortcut2 -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $NGShortcut, $NGShortcut2, $NGShortcutDesk -Force -ErrorAction SilentlyContinue
     Remove-Item -Path $NGDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
