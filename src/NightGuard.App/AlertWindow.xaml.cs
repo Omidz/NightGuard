@@ -11,7 +11,9 @@ public partial class AlertWindow : Window
         InitializeComponent();
         TitleText.Text = preview ? "PREVIEW: " + title : title;
         Body.Text = text;
-        if (urgent) Header.Background = (System.Windows.Media.Brush)FindResource("NgRed");
+        Header.Background = urgent ? Art.Alarm() : Art.NightSky();
+        HeaderEmoji.Text = urgent ? "\U0001F6A8" : title.Contains("Screen", StringComparison.OrdinalIgnoreCase) ? "\U0001F3AE" : "\u23F0";
+        if (urgent) HeaderEmoji.Foreground = System.Windows.Media.Brushes.White;
         if (!preview) StayOnTop.Enable(this, 5);
         if (autoCloseSeconds > 0)
         {

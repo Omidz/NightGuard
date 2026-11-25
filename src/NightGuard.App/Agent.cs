@@ -69,9 +69,9 @@ internal sealed class Agent : IDisposable
         }
         catch { icon = System.Drawing.SystemIcons.Shield; }
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("Open NightGuard", null, (_, _) => OpenMain());
-        menu.Items.Add("My journal", null, (_, _) => new JournalWindow().Show());
-        menu.Items.Add("Status and log", null, (_, _) => new StatusWindow().Show());
+        menu.Items.Add("🌙  Open NightGuard", null, (_, _) => OpenMain());
+        menu.Items.Add("📓  My journal", null, (_, _) => new JournalWindow().Show());
+        menu.Items.Add("📊  Status and log", null, (_, _) => new StatusWindow().Show());
         _tray = new Forms.NotifyIcon { Icon = icon, Text = "NightGuard", ContextMenuStrip = menu, Visible = true };
         _tray.DoubleClick += (_, _) => OpenMain();
         _trayTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(10) };

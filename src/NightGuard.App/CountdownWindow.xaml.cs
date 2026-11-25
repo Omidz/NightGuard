@@ -13,8 +13,16 @@ public partial class CountdownWindow : Window
     public CountdownWindow(int seconds, string actionWord, string why, bool preview)
     {
         InitializeComponent();
+        Root.Background = Art.NightSky();
+        Art.Stars(Sky, 620, 420, 45, 11);
+        MoonHolder.Children.Add(Art.Crescent(64, Art.Moon));
+        var zzz = Art.Zzz(18);
+        zzz.Margin = new Thickness(70, -6, 0, 0);
+        zzz.HorizontalAlignment = HorizontalAlignment.Left;
+        zzz.VerticalAlignment = VerticalAlignment.Top;
+        MoonHolder.Children.Add(zzz);
         _left = seconds;
-        Prefix.Text = preview ? "PREVIEW (nothing will happen)" : "It's bedtime.";
+        Prefix.Text = preview ? "PREVIEW (nothing will happen) \U0001F440" : "It's bedtime. Goodnight! \U0001F634";
         Line.Text = $"This PC will {actionWord} in {seconds} seconds.";
         WhyText.Text = string.IsNullOrWhiteSpace(why) ? "" : $"You said: “{why}”";
         WhyText.Visibility = string.IsNullOrWhiteSpace(why) ? Visibility.Collapsed : Visibility.Visible;

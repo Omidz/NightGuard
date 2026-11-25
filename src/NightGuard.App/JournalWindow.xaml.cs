@@ -39,20 +39,20 @@ public partial class JournalWindow : Window
 
         var moods = _entries.Take(7).Where(e => e.Mood > 0).Select(e => e.Mood).ToList();
         var avg = moods.Count > 0 ? $"average mood lately: {moods.Average():0.0} out of 5" : "no moods logged yet";
-        var streak = s is { Configured: true } ? $"Current streak: {s.Streak} clean night(s)" : "Streak: starts after setup";
+        var streak = s is { Configured: true } ? $"🔥 Current streak: {s.Streak} clean night(s)" : "Streak: starts after setup";
         Summary.Text = $"{streak}   |   {_entries.Count} entries   |   {avg}";
         var best = Math.Max(s?.BestStreak ?? 0, s?.Streak ?? 0);
         var earned = Badges.Earned(best);
         var badgeText = earned.Count > 0
-            ? $"Badges ({earned.Count} of {Badges.All.Length}): {string.Join(", ", earned.Select(b => b.Name))}"
-            : "Badges: none yet. First one after your first clean night!";
+            ? $"🏅 Badges ({earned.Count} of {Badges.All.Length}): {string.Join(", ", earned.Select(b => b.Name))}"
+            : "🏅 Badges: none yet. First one after your first clean night!";
         badgeText += Badges.Next(best) is { } next
-            ? $"\nNext: {next.Name} at {next.Nights} clean nights in a row (best so far: {best})."
-            : "\nAll badges earned. A full year. You absolute legend.";
+            ? $"\n🎯 Next: {next.Name} at {next.Nights} clean nights in a row (best so far: {best})."
+            : "\nAll badges earned. A full year. You absolute legend. 👑";
         BadgeText.Text = badgeText;
         WhyText.Text = string.IsNullOrWhiteSpace(s?.Why)
             ? "Why I started: not written yet. Add it on the \"Your why and journal\" step. Highly recommended!"
-            : $"Why I started: “{s.Why}”";
+            : $"💬 Why I started: “{s.Why}”";
     }
 
     private void Export_Click(object sender, RoutedEventArgs e)

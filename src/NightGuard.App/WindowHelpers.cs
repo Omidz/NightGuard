@@ -77,20 +77,13 @@ internal static class TimeText
 
 internal static class Ask
 {
-    public static void Info(Window? owner, string text) => Show(owner, text, MessageBoxButton.OK, MessageBoxImage.Information);
-    public static void Warn(Window? owner, string text) => Show(owner, text, MessageBoxButton.OK, MessageBoxImage.Warning);
-    public static void Error(Window? owner, string text) => Show(owner, text, MessageBoxButton.OK, MessageBoxImage.Error);
+    public static void Info(Window? owner, string text) => FunDialog.Show(owner, FunDialog.Mood.Info, text);
+    public static void Happy(Window? owner, string text) => FunDialog.Show(owner, FunDialog.Mood.Happy, text, "Yay!");
+    public static void Warn(Window? owner, string text) => FunDialog.Show(owner, FunDialog.Mood.Warn, text, "Got it");
+    public static void Error(Window? owner, string text) => FunDialog.Show(owner, FunDialog.Mood.Error, text);
 
-    public static bool YesNo(Window? owner, string text) =>
-        Show(owner, text, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+    public static bool YesNo(Window? owner, string text) => FunDialog.Show(owner, FunDialog.Mood.Question, text, "Yes", "No");
 
     /// <summary>The final "are you sure", with No as the default.</summary>
-    public static bool Sure(Window? owner, string text) =>
-        (owner is null
-            ? MessageBox.Show(text, "NightGuard - are you sure?", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)
-            : MessageBox.Show(owner, text, "NightGuard - are you sure?", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No))
-        == MessageBoxResult.Yes;
-
-    private static MessageBoxResult Show(Window? owner, string text, MessageBoxButton buttons, MessageBoxImage icon) =>
-        owner is null ? MessageBox.Show(text, "NightGuard", buttons, icon) : MessageBox.Show(owner, text, "NightGuard", buttons, icon);
+    public static bool Sure(Window? owner, string text) => FunDialog.Show(owner, FunDialog.Mood.Sure, text, "Yes, I'm sure", "No, take me back", defaultNo: true);
 }

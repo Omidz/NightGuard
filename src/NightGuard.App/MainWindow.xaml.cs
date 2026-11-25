@@ -41,6 +41,20 @@ public partial class MainWindow : Window
         ["SignOut"] = "Medium. Closes all your apps and signs you out, again if you sign back in.",
     };
 
+    // A little encouragement in the corner, one per page
+    private static readonly string[] Tips =
+    [
+        "Sleep isn't lost gaming time. It's how you get better at the game. \U0001F9E0",
+        "Most people need 7 to 9 hours. Your K/D ratio needs them too.",
+        "Screens off 30 minutes before bed helps you fall asleep faster. \U0001F4F5",
+        "Hibernate keeps your apps where you left them. Shutdown keeps nothing. Choose wisely.",
+        "\"Why\" beats willpower. Write yours down: it really helps.",
+        "A budget isn't a punishment. It's a plan. \U0001F4C5",
+        "Blocking the 1 AM rabbit holes is easier than resisting them.",
+        "Someone you trust holding the key? That's not weakness, that's strategy. \U0001F91D",
+        "Stricter is instant, looser takes a week. Past-you made a deal. \U0001F91D",
+    ];
+
     public MainWindow()
     {
         InitializeComponent();
@@ -171,7 +185,8 @@ public partial class MainWindow : Window
         var last = _pages.Length - 1;
         BackButton.IsEnabled = i > 0;
         NextButton.Visibility = i < last ? Visibility.Visible : Visibility.Collapsed;
-        NextButton.Content = i == 0 ? "Let's go" : i == last - 1 ? "Review" : "Next";
+        NextButton.Content = i == 0 ? "Let's go \U0001F680" : i == last - 1 ? "Review \U0001F440" : "Next \u2192";
+        TipText.Text = Tips[i % Tips.Length];
         // Save only on the last page, and only once the settings are confirmed
         SaveButton.Visibility = i == last && ConfirmCheck.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         SaveButton.IsEnabled = !_busy && _serviceError is null;
@@ -260,23 +275,24 @@ public partial class MainWindow : Window
     private const string WelcomeNew =
         "NightGuard is your bedtime bouncer. You tell it when you want to be in bed, and it makes sure your PC agrees with you. No more \"one more match\" at 2 AM.\n\n" +
         "We'll walk through a few short steps together:\n\n" +
-        "   1.  Bedtimes: when your nights start and end.\n" +
-        "   2.  Warnings: friendly (then less friendly) popups before bedtime.\n" +
-        "   3.  At bedtime: what your PC does when time is up.\n" +
-        "   4.  Your why and journal: your reason, a morning cheer, streaks and badges.\n" +
-        "   5.  Game and screen time: daily budgets, if you want them.\n" +
-        "   6.  Block sites and apps: goodbye, 1 AM doomscrolling (optional).\n" +
-        "   7.  Trusted person: hand the off switch to someone else (optional).\n" +
-        "   8.  Review and save: check everything, then switch it on.\n\n" +
+        "   \U0001F6CF\uFE0F  Bedtimes: when your nights start and end.\n" +
+        "   \u23F0  Warnings: friendly (then less friendly) popups before bedtime.\n" +
+        "   \U0001F50C  At bedtime: what your PC does when time is up.\n" +
+        "   \U0001F4AC  Your why and journal: your reason, a morning cheer, streaks and badges.\n" +
+        "   \U0001F3AE  Game and screen time: daily budgets, if you want them.\n" +
+        "   \U0001F6AB  Block sites and apps: goodbye, 1 AM doomscrolling (optional).\n" +
+        "   \U0001F510  Trusted person: hand the off switch to someone else (optional).\n" +
+        "   \u2705  Review and save: check everything, then switch it on.\n\n" +
         "The defaults are sensible, so if you're not sure about something, just click Next. Nothing starts until the very last page.\n\n" +
-        "Ready? Click \"Let's go\". Future you says thanks.";
+        "Ready? Click \"Let's go\". Future you says thanks. \U0001F64C";
 
     private void UpdateWelcome()
     {
         var s = _status;
         if (s is { Configured: true })
         {
-            WelcomeTitle.Text = "NightGuard is on duty";
+            Scene.Headline = "NightGuard is on duty \U0001F6E1\uFE0F";
+            Scene.Tagline = s.Streak > 1 ? $"{s.Streak} clean nights in a row. Look at you go! \U0001F525" : "Your nights are in good hands. Sleep tight!";
             WelcomeText.Text = "It's guarding your nights. No take-backs: that's the point.\n\n" +
                 "You can always make it STRICTER (earlier bedtime, more blocking, less game time) and save right away. " +
                 "Making it LOOSER works like quitting anything else: you ask, wait 7 days, and then decide with a clear head.";
@@ -287,18 +303,19 @@ public partial class MainWindow : Window
                 ? $"Last night: {d:dddd d MMMM yyyy}. After that, NightGuard removes itself. It can't be uninstalled before then."
                 : "No end date: it runs until you uninstall it (after a 7-day cool-off).";
             var lockText = s.TrustedEnabled ? "Trusted-person mode is on: changes and uninstall need your trusted person's code." : s.UnlockText;
-            var streak = s.Streak > 0 ? $"\U0001F525 {s.Streak} clean night(s) in a row." : "";
+            var streak = s.Streak > 0 ? $"\U0001F525 {s.Streak} clean night(s) in a row." : "\U0001F331 Your streak starts tonight.";
             StatusCardText.Text = string.Join("\n", new[] { next, end, lockText, streak, s.SafetyStandDown is { } sd ? $"Standing down: {sd}" : "" }.Where(x => x.Length > 0));
             StatusCard.Visibility = Visibility.Visible;
         }
         else
         {
-            WelcomeTitle.Text = "Hi there, night owl!";
+            Scene.Headline = "Hi there, night owl! \U0001F989";
+            Scene.Tagline = "Let's get you to bed on time. Future you is already grateful.";
             WelcomeText.Text = WelcomeNew;
             StatusCard.Visibility = _status?.SafetyStandDown is { } p ? Visibility.Visible : Visibility.Collapsed;
             StatusCardText.Text = _status?.SafetyStandDown is { } p2 ? $"The saved settings can't be used ({p2}). Saving new ones fixes it." : "";
         }
-        SaveButton.Content = Configured ? "Save and apply" : "Start NightGuard";
+        SaveButton.Content = Configured ? "Save and apply \u2728" : "Start NightGuard \U0001F319";
         JournalButton.IsEnabled = StatusButton.IsEnabled = _serviceError is null;
         UninstallButton.IsEnabled = Configured;
         UninstallButton.Content = !Configured || TrustedOn ? "Uninstall..." : s?.UnlockState switch
@@ -454,9 +471,9 @@ public partial class MainWindow : Window
             var r = _nights[i];
             var on = r.On.IsChecked == true;
             r.Bed.IsEnabled = r.Unlock.IsEnabled = on;
-            if (!on) { r.Note.Text = "free night"; r.Note.Foreground = null; continue; }
+            if (!on) { r.Note.Text = "\U0001F389 free night"; r.Note.Foreground = null; continue; }
             var hours = ScheduleMath.LockedHours(r.Bed.Value, r.Unlock.Value);
-            var text = hours is { } h ? $"locked {h:0.#} h" : "unlock must be after bedtime";
+            var text = hours is { } h ? $"\U0001F634 locked {h:0.#} h" : "\u26A0\uFE0F unlock must be after bedtime";
             if (ScheduleMath.ParseTime(r.Bed.Value).TotalHours < 12) text += ", early " + Defaults.DayNames[(i + 1) % 7][..3];
             r.Note.Text = text;
             r.Note.Foreground = hours is null or > 16 ? (System.Windows.Media.Brush)FindResource("NgRed") : null;
@@ -645,11 +662,11 @@ public partial class MainWindow : Window
         void Add(string l = "") => sb.AppendLine(l);
         if (errs.Count > 0)
         {
-            Add("PLEASE FIX THESE FIRST:");
+            Add("\u26A0\uFE0F  PLEASE FIX THESE FIRST:");
             foreach (var e in errs) Add("  - " + e);
             Add();
         }
-        Add("BEDTIMES");
+        Add("\U0001F6CF\uFE0F  BEDTIMES");
         for (var i = 0; i < 7; i++)
         {
             var s = cfg.Schedule[Defaults.Days[i]];
@@ -657,20 +674,20 @@ public partial class MainWindow : Window
             Add(s.Enabled ? $"  {name} {TimeText.Format(s.Bedtime)} until {TimeText.Format(s.Unlock)}" : $"  {name} free");
         }
         Add();
-        Add("WARNINGS");
+        Add("\u23F0  WARNINGS");
         if (cfg.Warnings.Count == 0) Add("  none");
         foreach (var w in cfg.Warnings) Add($"  {w.MinutesBefore} min before bedtime{(w.Sound ? ", with sound" : "")}");
         Add();
-        Add("AT BEDTIME");
+        Add("\U0001F50C  AT BEDTIME");
         Add($"  {cfg.Action} after a {cfg.CountdownSeconds} second countdown, repeating every {cfg.RecheckMinutes} min through the night");
         Add($"  Settings locked from {cfg.NightModeMinutes} min before bedtime until unlock");
         Add($"  End date: {(cfg.EndDate is { } ed ? $"last night is {ed}, then NightGuard removes itself" : "none")}");
         Add();
-        Add("YOUR WHY AND JOURNAL");
+        Add("\U0001F4AC  YOUR WHY AND JOURNAL");
         Add(cfg.Why.Length > 0 ? $"  \"{cfg.Why}\"" : "  (no reason written; we recommend one!)");
         Add($"  Morning check-in, streaks and badges: {(cfg.MorningCheckIn ? "on" : "off")}");
         Add();
-        Add("GAME AND SCREEN TIME");
+        Add("\U0001F3AE  GAME AND SCREEN TIME");
         var st = cfg.ScreenTime;
         if (st.Enabled)
         {
@@ -681,7 +698,7 @@ public partial class MainWindow : Window
         }
         else Add("  off");
         Add();
-        Add("BLOCKING");
+        Add("\U0001F6AB  BLOCKING");
         var b = cfg.Blocking;
         if (b.Enabled)
         {
@@ -691,7 +708,7 @@ public partial class MainWindow : Window
         }
         else Add("  off");
         Add();
-        Add("TRUSTED PERSON");
+        Add("\U0001F510  TRUSTED PERSON");
         Add(TrustedOn ? "  ON, saving needs the code" : TrustCheck.IsChecked == true ? $"  ON: your trusted person sets the code when you click {SaveButton.Content}" : "  off");
 
         ConfirmCheck.IsEnabled = errs.Count == 0;
@@ -704,7 +721,7 @@ public partial class MainWindow : Window
             if (check.Ok && check.Loosening is { Count: > 0 } loose)
             {
                 var head = new StringBuilder();
-                head.AppendLine(TrustedOn ? "LOOSER THAN NOW (allowed with the trusted person's code):" : "LOOSER THAN NOW (needs the 7-day cool-off, or undo these):");
+                head.AppendLine(TrustedOn ? "\U0001F513 LOOSER THAN NOW (allowed with the trusted person's code):" : "\U0001F6A7 LOOSER THAN NOW (needs the 7-day cool-off, or undo these):");
                 foreach (var l in loose) head.AppendLine("  - " + l);
                 head.AppendLine();
                 ReviewBox.Text = head + ReviewBox.Text;
@@ -812,7 +829,7 @@ public partial class MainWindow : Window
         if (newCode is not null) done += "\n\nTrusted-person mode is on. From now on, changes and uninstall need the trusted person's code.";
         Steps.SelectedIndex = 0;
         await ReloadAsync();
-        Ask.Info(this, done);
+        Ask.Happy(this, done);
     }
 
     private async void Discard_Click(object sender, RoutedEventArgs e) => await ReloadAsync();
