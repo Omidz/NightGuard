@@ -1,19 +1,33 @@
 <Window x:Class="NightGuard.App.CountdownWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:local="clr-namespace:NightGuard.App"
-        Title="NightGuard" Width="620" SizeToContent="Height" ResizeMode="NoResize"
-        WindowStartupLocation="CenterScreen" ShowInTaskbar="True" Icon="Assets/NightGuard.ico" Foreground="White">
+        Title="NightGuard: bedtime" Width="640" Height="480" WindowStyle="None" ResizeMode="NoResize"
+        ShowInTaskbar="True" Topmost="True" Icon="Assets/NightGuard.ico" Foreground="White">
     <Grid x:Name="Root">
         <Canvas x:Name="Sky" IsHitTestVisible="False" ClipToBounds="True" />
-        <StackPanel Margin="30,26,30,26">
-            <Grid x:Name="MoonHolder" HorizontalAlignment="Center" Margin="0,0,0,6" />
-            <TextBlock x:Name="Prefix" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
-            <TextBlock x:Name="Seconds" FontSize="80" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource NgMoon}" />
-            <TextBlock x:Name="Line" FontSize="18" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
-            <TextBlock x:Name="WhyText" FontSize="15" FontStyle="Italic" TextWrapping="Wrap" TextAlignment="Center" Margin="0,18,0,0" Opacity="0.9" />
-            <TextBlock Text="&#x1F4BE; Save your work now. Closing this window doesn't stop it." FontSize="12.5" Opacity="0.7"
-                       HorizontalAlignment="Center" Margin="0,18,0,0" />
-        </StackPanel>
+
+        <!-- Full screen: impossible to miss -->
+        <Grid x:Name="FullPanel">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="900" Margin="40">
+                <Grid x:Name="MoonHolder" HorizontalAlignment="Center" Margin="0,0,0,10" />
+                <TextBlock x:Name="Prefix" FontSize="28" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                <TextBlock x:Name="Seconds" FontSize="150" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource NgMoon}" />
+                <TextBlock x:Name="Line" FontSize="24" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
+                <TextBlock x:Name="WhyText" FontSize="20" FontStyle="Italic" TextWrapping="Wrap" TextAlignment="Center" Margin="0,24,0,0" Opacity="0.9" />
+                <Button x:Name="SaveFirstButton" Content="&#x1F4BE;  Let me save first" FontSize="18" Padding="26,12" Margin="0,34,0,0"
+                        HorizontalAlignment="Center" Click="SaveFirst_Click" Style="{DynamicResource AccentButtonStyle}" />
+                <TextBlock x:Name="SmallPrint" FontSize="14" Opacity="0.7" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,16,0,0" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Compact pill while you save: always on top, never steals your keyboard -->
+        <Border x:Name="PillPanel" Visibility="Collapsed" Padding="18,0">
+            <DockPanel VerticalAlignment="Center">
+                <Button DockPanel.Dock="Right" Content="&#x2922;" ToolTip="Show the full countdown" Padding="10,4" Click="Expand_Click" />
+                <TextBlock Text="&#x1F319;" FontFamily="Segoe UI Emoji" FontSize="26" Foreground="{StaticResource NgMoon}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                <TextBlock x:Name="PillSeconds" FontSize="34" FontWeight="Bold" Foreground="{StaticResource NgMoon}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                <TextBlock x:Name="PillText" FontSize="15" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </DockPanel>
+        </Border>
     </Grid>
 </Window>
