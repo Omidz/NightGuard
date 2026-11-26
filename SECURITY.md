@@ -19,6 +19,6 @@ Useful things to include: what you found, how to reproduce it, and which Windows
 
 ## What doesn't
 
-- A Windows **administrator** removing NightGuard by hand. That's intentional and documented, so nobody can get permanently stuck.
-- A Windows administrator editing NightGuard's files or changing the clock to skip the cool-off. Admins can always do that; it's the same as removing it by hand.
-- Browsers with secure DNS skipping the hosts-file blocking. That's a known limit, documented in the README.
+- A Windows **administrator** removing NightGuard by hand.
+- A Windows administrator editing NightGuard's files or changing the clock to skip the cool-off.
+- Browsers with secure DNS skipping the hosts-file blocking (a known limit).

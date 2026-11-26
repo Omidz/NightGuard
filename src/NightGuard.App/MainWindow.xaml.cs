@@ -284,7 +284,8 @@ public partial class MainWindow : Window
         "   \U0001F510  Trusted person: hand the off switch to someone else (optional).\n" +
         "   \u2705  Review and save: check everything, then switch it on.\n\n" +
         "The defaults are sensible, so if you're not sure about something, just click Next. Nothing starts until the very last page.\n\n" +
-        "Ready? Click \"Let's go\". Future you says thanks. \U0001F64C";
+        "Ready? Click \"Let's go\". Future you says thanks. \U0001F64C\n\n" +
+        "\u26A0\uFE0F Heads up: NightGuard really does shut down, hibernate and lock this PC. It comes with no warranty, and you use it at your own risk, so save your work at the warnings.";
 
     private void UpdateWelcome()
     {
