@@ -136,7 +136,7 @@ internal static class SystemTasks
     private static readonly string[] OldScripts =
     [
         "common.ps1", "enforce.ps1", "session.ps1", "warn.ps1", "blocker.ps1", "tracker.ps1", "notify.ps1", "checkin.ps1",
-        "install.ps1", "uninstall.ps1", "menu.ps1", "gui.ps1", "NightGuard.cmd", "TextMenu.cmd", "firewall.sig", "notify.json",
+        "install.ps1", "uninstall.ps1", "menu.ps1", "gui.ps1", "NightGuard.cmd", "TextMenu.cmd", "firewall.sig", "notify.json", "shutdown-pending.txt",
     ];
 
     /// <summary>
@@ -158,6 +158,26 @@ internal static class SystemTasks
             }
             store.Log("upgraded from the PowerShell version: old tasks and scripts removed, settings kept");
             migrated = true;
+        }
+
+        // The later PowerShell version pinned the time zone in timezone.txt; the C# version keeps it in the settings
+        var zoneFile = Path.Combine(store.Dir, "timezone.txt");
+        if (File.Exists(zoneFile))
+        {
+            try
+            {
+                var id = File.ReadAllLines(zoneFile).FirstOrDefault()?.Trim();
+                if (!string.IsNullOrEmpty(id) && store.ReadConfig(out _) is { TimeZone: null } zoned)
+                {
+                    TimeZoneInfo.FindSystemTimeZoneById(id);   // must exist
+                    zoned.TimeZone = id;
+                    store.WriteConfig(zoned);
+                    store.Log($"pinned time zone carried over from the PowerShell version: {id}");
+                }
+                Store.TryDelete(zoneFile);
+                migrated = true;
+            }
+            catch (Exception e) { store.Log($"pinned time zone could not be carried over: {e.Message}"); }
         }
 
         var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
