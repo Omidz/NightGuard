@@ -12,6 +12,9 @@ namespace NightGuard.Core.Config;
 //   NightModeMinutes  Settings and uninstall are blocked from this long before bedtime until unlock (0-240)
 //   EndDate           yyyy-MM-dd: the last locked night. NightGuard removes itself after it. null = never.
 //   Why               Your reason, in your words
+//   Plan              Your if-then plan for the final warning ("When the 5-minute warning pops up, I will ...")
+//   CommitNights      How many nights you committed to (0 = forever, null = no commitment yet). A goal, not a lock.
+//   CommitStart       yyyy-MM-dd: the day that commitment started
 //   MorningCheckIn    Morning check-in, streaks, badges and journal
 //   Blocking          Sites (hosts file) and apps (Windows Firewall), during bedtime and/or time slots
 //   ScreenTime        Daily game and screen time budgets
@@ -78,6 +81,9 @@ public sealed class NightGuardConfig
     public string? EndDate { get; set; }
     public bool MorningCheckIn { get; set; } = true;
     public string Why { get; set; } = "";
+    public string Plan { get; set; } = "";
+    public int? CommitNights { get; set; }
+    public string? CommitStart { get; set; }
     public bool ShortcutStartMenu { get; set; } = true;
     public bool ShortcutDesktop { get; set; }
     public BlockingSettings Blocking { get; set; } = new();

@@ -25,6 +25,10 @@ public static partial class ConfigValidator
         }
         if (!anyOn) errs.Add("Every night is turned off. Turn on at least one night, or uninstall instead.");
         if (cfg.Why.Length > 300) errs.Add("\"Why I started\" can be at most 300 characters.");
+        if (cfg.Plan.Length > 200) errs.Add("Your plan can be at most 200 characters.");
+        if (cfg.CommitNights is < 0 or > 3650) errs.Add("A commitment can be 1 to 3650 nights, or forever.");
+        if (cfg.CommitStart is { } cs && !DateTime.TryParseExact(cs, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+            errs.Add($"Commitment start '{cs}' is not a date like 2027-01-31.");
         if (errs.Count == 0)
         {
             var reference = new DateTime(2024, 1, 1);   // a Monday

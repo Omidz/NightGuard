@@ -11,9 +11,9 @@ namespace NightGuard.App;
 /// </summary>
 public sealed class TimePicker : StackPanel
 {
-    private readonly ComboBox _hour = new() { Width = 72 };
-    private readonly ComboBox _minute = new() { Width = 72 };
-    private readonly ComboBox _ampm = new() { Width = 76, Margin = new Thickness(6, 0, 0, 0) };
+    private readonly ComboBox _hour = new() { Width = 64 };
+    private readonly ComboBox _minute = new() { Width = 64 };
+    private readonly ComboBox _ampm = new() { Width = 70, Margin = new Thickness(6, 0, 0, 0) };
     private readonly bool _is12 = TimeText.Is12Hour;
     private bool _setting;
 

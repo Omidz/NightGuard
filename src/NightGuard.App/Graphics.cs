@@ -96,107 +96,124 @@ internal static class Art
 }
 
 /// <summary>
-/// The colourful banner at the top of each page: a night-sky gradient, a few stars, a big tinted
-/// emoji, a title and a cheeky one-liner.
+/// The top of each page: a round badge with a tinted emoji, "STEP 3 OF 9", a big title and a
+/// cheeky one-liner. Everything wraps, so it works at any window size and scaling.
 /// </summary>
-public sealed class PageHeader : Border
+public sealed class PageHeader : DockPanel
 {
-    private readonly TextBlock _emoji = Art.Emoji("", 40, Art.Moon);
-    private readonly TextBlock _title = new() { Foreground = Brushes.White, FontSize = 26, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
-    private readonly TextBlock _sub = new() { Foreground = new SolidColorBrush(Color.FromArgb(0xDD, 0xFF, 0xFF, 0xFF)), FontSize = 14, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) };
+    private readonly TextBlock _emoji = Art.Emoji("", 30, Art.Moon);
+    private readonly TextBlock _step = new();
+    private readonly TextBlock _title = new();
+    private readonly TextBlock _sub = new() { Margin = new Thickness(0, 6, 0, 0) };
 
     public PageHeader()
     {
-        Background = Art.NightSky();
-        CornerRadius = new CornerRadius(14);
-        Margin = new Thickness(0, 0, 0, 20);
-        ClipToBounds = true;
-        var grid = new Grid { MinHeight = 96 };
-        var stars = new Canvas { IsHitTestVisible = false };
-        stars.Loaded += (_, _) => { if (stars.Children.Count == 0) Art.Stars(stars, 1400, 120, 40, (Title?.Length ?? 7) * 31, twinkle: true); };
-        grid.Children.Add(stars);
-        var moon = Art.Crescent(70, new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xD6, 0x66)));
-        moon.HorizontalAlignment = HorizontalAlignment.Right;
-        moon.VerticalAlignment = VerticalAlignment.Top;
-        moon.Margin = new Thickness(0, -8, 24, 0);
-        grid.Children.Add(moon);
-        var row = new DockPanel { Margin = new Thickness(22, 18, 110, 18) };
+        Margin = new Thickness(0, 0, 0, 24);
+        _step.SetResourceReference(StyleProperty, "Overline");
+        _title.SetResourceReference(StyleProperty, "H1");
+        _sub.SetResourceReference(StyleProperty, "Lead");
+        _sub.Margin = new Thickness(0, 6, 0, 0);
         var badge = new Border
         {
             Width = 64, Height = 64, CornerRadius = new CornerRadius(32), Margin = new Thickness(0, 0, 18, 0),
-            Background = new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF)), Child = _emoji, VerticalAlignment = VerticalAlignment.Center,
+            Background = Art.NightSky(), BorderThickness = new Thickness(2, 2, 2, 4), Child = _emoji, VerticalAlignment = VerticalAlignment.Top,
         };
-        DockPanel.SetDock(badge, Dock.Left);
-        row.Children.Add(badge);
+        badge.SetResourceReference(Border.BorderBrushProperty, "NgStroke");
+        SetDock(badge, Dock.Left);
+        Children.Add(badge);
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        text.Children.Add(_step);
         text.Children.Add(_title);
         text.Children.Add(_sub);
-        row.Children.Add(text);
-        grid.Children.Add(row);
-        Child = grid;
+        Children.Add(text);
+        Step = "";
     }
 
     public string Emoji { get => _emoji.Text; set => _emoji.Text = value; }
     public string Title { get => _title.Text; set => _title.Text = value; }
+    public string Step { get => _step.Text; set { _step.Text = value.ToUpperInvariant(); _step.Visibility = string.IsNullOrEmpty(value) ? Visibility.Collapsed : Visibility.Visible; } }
     public string Subtitle { get => _sub.Text; set { _sub.Text = value; _sub.Visibility = string.IsNullOrEmpty(value) ? Visibility.Collapsed : Visibility.Visible; } }
     public Brush EmojiColor { get => _emoji.Foreground; set => _emoji.Foreground = value; }
 }
 
-/// <summary>The welcome page's night sky: gradient, moon, twinkling stars, hills and a sleepy "zzz".</summary>
+/// <summary>The welcome page's night sky: gradient, moon, twinkling stars, hills, and Hoot the owl on a branch.</summary>
 public sealed class NightScene : Border
 {
-    private readonly TextBlock _headline = new() { Foreground = Brushes.White, FontSize = 34, FontWeight = FontWeights.Bold, TextWrapping = TextWrapping.Wrap };
-    private readonly TextBlock _tagline = new() { Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF)), FontSize = 16, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0) };
+    private readonly TextBlock _headline = new() { Foreground = Brushes.White, FontSize = 36, FontWeight = FontWeights.Bold, TextWrapping = TextWrapping.Wrap };
+    private readonly TextBlock _tagline = new() { Foreground = new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF)), FontSize = 17, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 0) };
+    private readonly Owl _owl = new() { Width = 120, Height = 130 };
 
     public NightScene()
     {
         Background = Art.NightSky();
-        CornerRadius = new CornerRadius(18);
-        Height = 230;
+        CornerRadius = new CornerRadius(22);
+        BorderThickness = new Thickness(2, 2, 2, 6);
+        SetResourceReference(BorderBrushProperty, "NgStroke");
+        MinHeight = 250;
         ClipToBounds = true;
-        Margin = new Thickness(0, 0, 0, 22);
+        Margin = new Thickness(0, 0, 0, 24);
+        _headline.SetResourceReference(TextBlock.FontFamilyProperty, "NgDisplay");
         var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var artColumn = new ColumnDefinition { Width = new GridLength(250) };
+        grid.ColumnDefinitions.Add(artColumn);
+
         var sky = new Canvas { IsHitTestVisible = false };
-        sky.Loaded += (_, _) => { if (sky.Children.Count == 0) Art.Stars(sky, 1500, 180, 70, 42); };
+        Grid.SetColumnSpan(sky, 2);
+        sky.Loaded += (_, _) => { if (sky.Children.Count == 0) Art.Stars(sky, 1600, 260, 80, 42); };
         grid.Children.Add(sky);
 
-        // Rolling hills along the bottom
         var hills = new Path
         {
             Data = Geometry.Parse("M0,60 C150,10 300,10 450,45 C600,80 750,20 900,35 C1050,50 1200,15 1400,40 L1400,90 L0,90 Z"),
-            Fill = new SolidColorBrush(Art.C("#120F2E")), Stretch = Stretch.Fill, Height = 70, VerticalAlignment = VerticalAlignment.Bottom,
+            Fill = new SolidColorBrush(Art.C("#120F2E")), Stretch = Stretch.Fill, Height = 60, VerticalAlignment = VerticalAlignment.Bottom,
         };
+        Grid.SetColumnSpan(hills, 2);
         grid.Children.Add(hills);
 
-        // The moon with a soft glow
-        var moonHolder = new Grid { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 26, 60, 0) };
+        var art = new Grid { Margin = new Thickness(0, 18, 18, 0) };
+        Grid.SetColumn(art, 1);
+        var moonHolder = new Grid { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 4, 18, 0) };
         moonHolder.Children.Add(new Ellipse
         {
-            Width = 150, Height = 150, Margin = new Thickness(-30),
+            Width = 130, Height = 130, Margin = new Thickness(-26),
             Fill = new RadialGradientBrush(Color.FromArgb(0x55, 0xFF, 0xD6, 0x66), Color.FromArgb(0, 0xFF, 0xD6, 0x66)),
         });
-        moonHolder.Children.Add(Art.Crescent(90, Art.Moon));
-        var zzz = Art.Zzz(22);
+        moonHolder.Children.Add(Art.Crescent(78, Art.Moon));
+        art.Children.Add(moonHolder);
+        // A branch for Hoot to sit on
+        art.Children.Add(new Path
+        {
+            Data = Geometry.Parse("M 0,10 C 60,0 140,14 240,4"), Stroke = new SolidColorBrush(Art.C("#5A3A28")), StrokeThickness = 9,
+            StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(-30, 0, -10, 46),
+        });
+        _owl.HorizontalAlignment = HorizontalAlignment.Left;
+        _owl.VerticalAlignment = VerticalAlignment.Bottom;
+        _owl.Margin = new Thickness(40, 0, 0, 50);
+        art.Children.Add(_owl);
+        var zzz = Art.Zzz(18);
         zzz.HorizontalAlignment = HorizontalAlignment.Left;
-        zzz.VerticalAlignment = VerticalAlignment.Top;
-        zzz.Margin = new Thickness(-56, -10, 0, 0);
-        moonHolder.Children.Add(zzz);
-        grid.Children.Add(moonHolder);
+        zzz.VerticalAlignment = VerticalAlignment.Bottom;
+        zzz.Margin = new Thickness(150, 0, 0, 160);
+        art.Children.Add(zzz);
+        grid.Children.Add(art);
 
-        var s1 = Art.Sparkle(18, Brushes.White);
-        s1.HorizontalAlignment = HorizontalAlignment.Right; s1.VerticalAlignment = VerticalAlignment.Top; s1.Margin = new Thickness(0, 30, 230, 0);
-        var s2 = Art.Sparkle(12, Art.Moon);
-        s2.HorizontalAlignment = HorizontalAlignment.Right; s2.VerticalAlignment = VerticalAlignment.Top; s2.Margin = new Thickness(0, 140, 40, 0);
-        grid.Children.Add(s1);
-        grid.Children.Add(s2);
-
-        var text = new StackPanel { Margin = new Thickness(32, 34, 280, 60), VerticalAlignment = VerticalAlignment.Top };
+        var text = new StackPanel { Margin = new Thickness(34, 34, 12, 70), VerticalAlignment = VerticalAlignment.Center };
         text.Children.Add(_headline);
         text.Children.Add(_tagline);
         grid.Children.Add(text);
         Child = grid;
+
+        // Narrow window: drop the artwork, keep the words
+        SizeChanged += (_, e) =>
+        {
+            var narrow = e.NewSize.Width < 620;
+            artColumn.Width = new GridLength(narrow ? 0 : 250);
+            art.Visibility = narrow ? Visibility.Collapsed : Visibility.Visible;
+        };
     }
 
     public string Headline { get => _headline.Text; set => _headline.Text = value; }
     public string Tagline { get => _tagline.Text; set => _tagline.Text = value; }
+    public OwlMood OwlMood { get => _owl.Mood; set => _owl.Mood = value; }
 }

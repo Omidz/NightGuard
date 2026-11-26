@@ -2,345 +2,498 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:NightGuard.App"
-        Title="NightGuard" Width="1180" Height="780" MinWidth="980" MinHeight="640"
-        WindowStartupLocation="CenterScreen" Icon="Assets/NightGuard.ico">
-    <Grid>
+        Title="NightGuard" Width="1180" Height="800" MinWidth="720" MinHeight="560"
+        WindowStartupLocation="CenterScreen" Icon="Assets/NightGuard.ico"
+        Background="{StaticResource NgBg}" Foreground="{StaticResource NgText}" UseLayoutRounding="True">
+    <Window.Resources>
+        <Style x:Key="PageBody" TargetType="StackPanel">
+            <Setter Property="Margin" Value="40,32,40,40" />
+            <Setter Property="MaxWidth" Value="1040" />
+        </Style>
+        <Style x:Key="PageScroll" TargetType="ScrollViewer">
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="Visibility" Value="Collapsed" />
+        </Style>
+        <Style x:Key="StepEmoji" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource NgEmoji}" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="Width" Value="32" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="StepLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style x:Key="ListText" TargetType="TextBox">
+            <Setter Property="AcceptsReturn" Value="True" />
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="Root">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="250" />
+            <ColumnDefinition x:Name="SideColumn" Width="252" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- ============================================================ step list -->
-        <Border Grid.Column="0" Background="{DynamicResource LayerFillColorDefaultBrush}"
-                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
-            <DockPanel Margin="14,18,14,14">
-                <StackPanel DockPanel.Dock="Top" Margin="6,0,0,18">
-                    <StackPanel Orientation="Horizontal">
-                        <Image Source="Assets/NightGuard.ico" Width="36" Height="36" Margin="0,0,10,0" />
-                        <TextBlock Text="NightGuard" FontSize="24" FontWeight="Bold" VerticalAlignment="Center" />
+        <!-- ============================================================ sidebar -->
+        <Border Grid.Column="0" Background="{StaticResource NgSidebar}" BorderBrush="{StaticResource NgStroke}" BorderThickness="0,0,2,0">
+            <DockPanel Margin="12,18,12,14">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="4,0,0,20">
+                    <local:Owl Width="46" Height="50" Bob="False" />
+                    <StackPanel x:Name="BrandText" VerticalAlignment="Center" Margin="10,0,0,0">
+                        <TextBlock Text="NightGuard" FontFamily="{StaticResource NgDisplay}" FontSize="22" FontWeight="Bold" />
+                        <TextBlock Text="your bedtime bouncer" FontSize="12.5" Foreground="{StaticResource NgMoon}" />
                     </StackPanel>
-                    <TextBlock Text="your bedtime bouncer" FontStyle="Italic" Opacity="0.65" Margin="46,-4,0,0" />
                 </StackPanel>
                 <StackPanel DockPanel.Dock="Bottom">
-                    <Border CornerRadius="10" Padding="12,10" Margin="0,0,0,10" Background="{StaticResource NgTipBrush}">
-                        <StackPanel>
-                            <TextBlock Text="&#x1F4A1; Tip of the night" FontWeight="SemiBold" Foreground="White" />
-                            <TextBlock x:Name="TipText" TextWrapping="Wrap" Foreground="White" Opacity="0.9" Margin="0,4,0,0" FontSize="12.5" />
-                        </StackPanel>
-                    </Border>
-                    <Button x:Name="JournalButton" Content="&#x1F4D3;  My journal" HorizontalAlignment="Stretch" Margin="0,4" Padding="10,7" Click="Journal_Click" />
-                    <Button x:Name="StatusButton" Content="&#x1F4CA;  Status and log" HorizontalAlignment="Stretch" Margin="0,4" Padding="10,7" Click="Status_Click" />
-                    <Button x:Name="UninstallButton" Content="&#x1F6AA;  Request uninstall..." HorizontalAlignment="Stretch" Margin="0,4" Padding="10,7" Click="Uninstall_Click" />
-                    <Button x:Name="DiscardButton" Content="&#x21A9;&#xFE0F;  Discard changes" HorizontalAlignment="Stretch" Margin="0,4" Padding="10,7" Click="Discard_Click" />
+                    <Separator Margin="4,6,4,8" Background="{StaticResource NgStroke}" />
+                    <Button x:Name="JournalButton" Style="{StaticResource SideButton}" Click="Journal_Click" ToolTip="My journal">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="📓" Style="{StaticResource StepEmoji}" /><TextBlock Text="My journal" Style="{StaticResource StepLabel}" Tag="label" /></StackPanel>
+                    </Button>
+                    <Button x:Name="StatusButton" Style="{StaticResource SideButton}" Click="Status_Click" ToolTip="Status and log">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="📊" Style="{StaticResource StepEmoji}" /><TextBlock Text="Status and log" Style="{StaticResource StepLabel}" Tag="label" /></StackPanel>
+                    </Button>
+                    <Button x:Name="DiscardButton" Style="{StaticResource SideButton}" Click="Discard_Click" ToolTip="Discard changes">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="↩️" Style="{StaticResource StepEmoji}" /><TextBlock Text="Discard changes" Style="{StaticResource StepLabel}" Tag="label" /></StackPanel>
+                    </Button>
+                    <Button x:Name="UninstallButton" Style="{StaticResource SideButton}" Click="Uninstall_Click" ToolTip="Uninstall">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="🚪" Style="{StaticResource StepEmoji}" /><TextBlock x:Name="UninstallText" Text="Request uninstall..." Style="{StaticResource StepLabel}" Tag="label" /></StackPanel>
+                    </Button>
                 </StackPanel>
-                <ListBox x:Name="Steps" SelectionChanged="Steps_SelectionChanged" BorderThickness="0" Background="Transparent" FontSize="15">
-                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="👋" FontFamily="Segoe UI Emoji" Foreground="#FFB86B" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Welcome" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
-                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="🛏️" FontFamily="Segoe UI Emoji" Foreground="#8FA2FF" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Bedtimes" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
-                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="⏰" FontFamily="Segoe UI Emoji" Foreground="#FF8A5B" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Warnings" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
-                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="🔌" FontFamily="Segoe UI Emoji" Foreground="#B08CFF" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="At bedtime" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
-                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="💬" FontFamily="Segoe UI Emoji" Foreground="#5EC8E5" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Your why and journal" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
-                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="🎮" FontFamily="Segoe UI Emoji" Foreground="#7ED37E" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Game and screen time" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
-                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="🚫" FontFamily="Segoe UI Emoji" Foreground="#F06A6A" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Block sites and apps" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
-                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="🔐" FontFamily="Segoe UI Emoji" Foreground="#FFD666" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Trusted person" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
-                    <ListBoxItem><StackPanel Orientation="Horizontal"><TextBlock Text="✅" FontFamily="Segoe UI Emoji" Foreground="#4CC38A" FontSize="18" Width="30" VerticalAlignment="Center" /><TextBlock Text="Review and save" VerticalAlignment="Center" /></StackPanel></ListBoxItem>
-                    </ListBox>
+                <ListBox x:Name="Steps" SelectionChanged="Steps_SelectionChanged" BorderThickness="0" Background="Transparent"
+                         ItemContainerStyle="{StaticResource StepItem}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBoxItem ToolTip="Welcome"><StackPanel Orientation="Horizontal"><TextBlock Text="👋" Style="{StaticResource StepEmoji}" /><TextBlock x:Name="WelcomeStepText" Text="Welcome" Style="{StaticResource StepLabel}" Tag="label" /></StackPanel></ListBoxItem>
+                    <ListBoxItem ToolTip="Your why"><StackPanel Orientation="Horizontal"><TextBlock Text="💬" Style="{StaticResource StepEmoji}" /><TextBlock Text="Your why" Style="{StaticResource StepLabel}" Tag="label" /></StackPanel></ListBoxItem>
+                    <ListBoxItem ToolTip="Bedtimes"><StackPanel Orientation="Horizontal"><TextBlock Text="🛏️" Style="{StaticResource StepEmoji}" /><TextBlock Text="Bedtimes" Style="{StaticResource StepLabel}" Tag="label" /></StackPanel></ListBoxItem>
+                    <ListBoxItem ToolTip="Warnings"><StackPanel Orientation="Horizontal"><TextBlock Text="⏰" Style="{StaticResource StepEmoji}" /><TextBlock Text="Warnings" Style="{StaticResource StepLabel}" Tag="label" /></StackPanel></ListBoxItem>
+                    <ListBoxItem ToolTip="At bedtime"><StackPanel Orientation="Horizontal"><TextBlock Text="🌙" Style="{StaticResource StepEmoji}" /><TextBlock Text="At bedtime" Style="{StaticResource StepLabel}" Tag="label" /></StackPanel></ListBoxItem>
+                    <ListBoxItem ToolTip="Game and screen time"><StackPanel Orientation="Horizontal"><TextBlock Text="🎮" Style="{StaticResource StepEmoji}" /><TextBlock Text="Game and screen time" Style="{StaticResource StepLabel}" Tag="label" /></StackPanel></ListBoxItem>
+                    <ListBoxItem ToolTip="Block sites and apps"><StackPanel Orientation="Horizontal"><TextBlock Text="🚫" Style="{StaticResource StepEmoji}" /><TextBlock Text="Block sites and apps" Style="{StaticResource StepLabel}" Tag="label" /></StackPanel></ListBoxItem>
+                    <ListBoxItem ToolTip="Trusted person"><StackPanel Orientation="Horizontal"><TextBlock Text="🔐" Style="{StaticResource StepEmoji}" /><TextBlock Text="Trusted person" Style="{StaticResource StepLabel}" Tag="label" /></StackPanel></ListBoxItem>
+                    <ListBoxItem ToolTip="Review"><StackPanel Orientation="Horizontal"><TextBlock Text="✅" Style="{StaticResource StepEmoji}" /><TextBlock Text="Review" Style="{StaticResource StepLabel}" Tag="label" /></StackPanel></ListBoxItem>
+                </ListBox>
             </DockPanel>
         </Border>
 
-        <!-- ============================================================ pages -->
+        <!-- ============================================================ content -->
         <DockPanel Grid.Column="1">
             <!-- Service / account banner -->
-            <Border x:Name="Banner" DockPanel.Dock="Top" Visibility="Collapsed" Padding="18,10" Background="{StaticResource NgIndigo}">
+            <Border x:Name="Banner" DockPanel.Dock="Top" Visibility="Collapsed" Padding="22,12" Background="{StaticResource NgIndigo}">
                 <DockPanel>
-                    <Button x:Name="BannerButton" DockPanel.Dock="Right" Padding="12,5" Margin="12,0,0,0" Click="BannerButton_Click" />
-                    <TextBlock x:Name="BannerText" Foreground="White" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="13" />
+                    <Button x:Name="BannerButton" DockPanel.Dock="Right" Margin="12,0,0,0" Click="BannerButton_Click" Style="{StaticResource ChunkyButton}" Padding="14,6" />
+                    <TextBlock x:Name="BannerText" Foreground="White" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="13.5" />
                 </DockPanel>
             </Border>
 
-            <!-- Back / Next / Save -->
-            <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="24,12">
+            <!-- Back / Next / Start -->
+            <Border DockPanel.Dock="Bottom" Background="{StaticResource NgSidebar}" BorderBrush="{StaticResource NgStroke}" BorderThickness="0,2,0,0" Padding="24,12">
                 <DockPanel>
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                        <Button x:Name="BackButton" Content="Back" MinWidth="100" Padding="14,8" Margin="0,0,10,0" Click="Back_Click" />
-                        <Button x:Name="NextButton" Content="Next" MinWidth="170" Padding="14,8" Click="Next_Click" Style="{DynamicResource AccentButtonStyle}" />
-                        <Button x:Name="SaveButton" Content="Start NightGuard" MinWidth="170" Padding="14,8" Click="Save_Click" Visibility="Collapsed"
-                                Style="{DynamicResource AccentButtonStyle}" />
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="BackButton" Content="Back" MinWidth="90" Margin="0,0,10,0" Click="Back_Click" Style="{StaticResource ChunkyButton}" />
+                        <Button x:Name="NextButton" Content="Next" MinWidth="150" Click="Next_Click" Style="{StaticResource MoonButton}" />
+                        <Button x:Name="SaveButton" Content="Start NightGuard" MinWidth="170" Click="Save_Click" Visibility="Collapsed" Style="{StaticResource MoonButton}" />
                     </StackPanel>
-                    <TextBlock x:Name="BottomHint" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,16,0" Opacity="0.75" />
+                    <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                        <ProgressBar x:Name="StepProgress" Height="6" Maximum="8" Margin="0,0,0,6" MaxWidth="320" HorizontalAlignment="Left" Width="320" />
+                        <TextBlock x:Name="BottomHint" TextWrapping="Wrap" FontSize="13" Foreground="{StaticResource NgMuted}" />
+                    </StackPanel>
                 </DockPanel>
             </Border>
 
-            <Grid x:Name="Pages" Margin="0">
+            <Grid x:Name="Pages">
 
-                <!-- 1. Welcome -->
-                <ScrollViewer x:Name="PageWelcome" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="36,28,36,28" MaxWidth="860" HorizontalAlignment="Left">
-                        <local:NightScene x:Name="Scene" Headline="Hi there, night owl! &#x1F989;" Tagline="Let's get you to bed on time. Future you is already grateful." />
-                        <TextBlock x:Name="WelcomeText" Style="{StaticResource Lead}" FontSize="15" LineHeight="24" />
-                        <Border x:Name="StatusCard" Style="{StaticResource Card}" Visibility="Collapsed">
-                            <TextBlock x:Name="StatusCardText" TextWrapping="Wrap" FontSize="14" LineHeight="22" />
+                <!-- 0. Welcome / home -->
+                <ScrollViewer x:Name="PageWelcome" Style="{StaticResource PageScroll}" Visibility="Visible">
+                    <StackPanel Style="{StaticResource PageBody}">
+                        <local:NightScene x:Name="Scene" Headline="Hi there, night owl!" Tagline="Let's get you to bed on time. Future you is already grateful." />
+
+                        <!-- First run -->
+                        <StackPanel x:Name="NewUserPanel">
+                            <TextBlock Style="{StaticResource Lead}" FontSize="16"
+                                       Text="NightGuard is your bedtime bouncer. You tell it when you want to be in bed, and it makes sure your PC agrees with you. No more &quot;one more match&quot; at 2 AM. Setup takes about five minutes, and nothing starts until the very last step." />
+                            <TextBlock Text="How it works" Style="{StaticResource H2}" Margin="0,4,0,12" />
+                            <WrapPanel x:Name="HowItWorks" />
+                            <Border Style="{StaticResource DangerCard}" Margin="0,8,0,0">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Left" Text="⚠️" FontFamily="{StaticResource NgEmoji}" FontSize="24" Margin="0,0,14,0" VerticalAlignment="Top" />
+                                    <TextBlock TextWrapping="Wrap" LineHeight="21" FontSize="14">
+                                        <Run FontWeight="Bold" Text="Before you start:" />
+                                        <Run Text="NightGuard really does shut down, hibernate and lock this PC. It comes with no warranty, and you use it at your own risk, so save your work when the warnings pop up." />
+                                    </TextBlock>
+                                </DockPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Home, once it's running -->
+                        <StackPanel x:Name="HomePanel" Visibility="Collapsed">
+                            <Border x:Name="CommitDoneCard" Style="{StaticResource Card}" BorderBrush="{StaticResource NgMoon}" Visibility="Collapsed">
+                                <DockPanel>
+                                    <local:Owl DockPanel.Dock="Left" Mood="Happy" Width="80" Height="86" Margin="0,0,18,0" />
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock x:Name="CommitDoneTitle" Style="{StaticResource SerifTitle}" FontSize="28" />
+                                        <TextBlock x:Name="CommitDoneText" Style="{StaticResource Hint}" FontSize="14" Margin="0,4,0,12" />
+                                        <WrapPanel>
+                                            <Button Content="🎯  Commit again" Style="{StaticResource MoonButton}" Click="CommitAgain_Click" Margin="0,0,10,0" />
+                                            <Button Content="🎉  Celebrate first" Style="{StaticResource ChunkyButton}" Click="Celebrate_Click" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+                            <WrapPanel x:Name="HomeTiles">
+                                <Border Style="{StaticResource TileCard}" Width="256">
+                                    <StackPanel>
+                                        <TextBlock Text="TONIGHT" Style="{StaticResource Overline}" />
+                                        <TextBlock x:Name="TonightBig" FontFamily="{StaticResource NgDisplay}" FontSize="30" FontWeight="Bold" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="TonightText" Style="{StaticResource Hint}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource TileCard}" Width="256">
+                                    <StackPanel>
+                                        <TextBlock Text="STREAK" Style="{StaticResource Overline}" />
+                                        <TextBlock x:Name="StreakBig" FontFamily="{StaticResource NgDisplay}" FontSize="30" FontWeight="Bold" />
+                                        <TextBlock x:Name="StreakText" Style="{StaticResource Hint}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource TileCard}" Width="256">
+                                    <DockPanel>
+                                        <Grid DockPanel.Dock="Right" Width="76" Height="76" Margin="10,0,0,0">
+                                            <local:RingArc x:Name="CommitRing" Thickness="9" />
+                                            <TextBlock x:Name="CommitRingText" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="16" />
+                                        </Grid>
+                                        <StackPanel>
+                                            <TextBlock Text="COMMITMENT" Style="{StaticResource Overline}" />
+                                            <TextBlock x:Name="CommitBig" FontFamily="{StaticResource NgDisplay}" FontSize="22" FontWeight="Bold" TextWrapping="Wrap" />
+                                            <TextBlock x:Name="CommitText" Style="{StaticResource Hint}" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </WrapPanel>
+                            <Border Style="{StaticResource Card}" Background="{StaticResource NgSkyBrush}">
+                                <StackPanel>
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Content="Edit" Style="{StaticResource LinkButton}" Click="EditWhy_Click" VerticalAlignment="Top" />
+                                        <TextBlock Text="YOUR WHY" Style="{StaticResource Overline}" />
+                                    </DockPanel>
+                                    <TextBlock x:Name="HomeWhy" Style="{StaticResource SerifQuote}" FontSize="24" LineHeight="33" Margin="0,4,0,0" />
+                                    <TextBlock x:Name="HomePlan" Style="{StaticResource Hint}" FontSize="14" Margin="0,10,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <TextBlock x:Name="StatusCardText" TextWrapping="Wrap" FontSize="14" LineHeight="22" />
+                            </Border>
+                            <WrapPanel>
+                                <Button Content="⚙️  Change settings" Style="{StaticResource MoonButton}" Click="Next_Click" Margin="0,0,10,10" />
+                                <Button Content="📓  My journal" Style="{StaticResource ChunkyButton}" Click="Journal_Click" Margin="0,0,10,10" />
+                            </WrapPanel>
+                            <TextBlock x:Name="WelcomeText" Style="{StaticResource Hint}" Margin="0,8,0,0" />
+                        </StackPanel>
+                        <Border x:Name="StandDownCard" Style="{StaticResource DangerCard}" Visibility="Collapsed">
+                            <TextBlock x:Name="StandDownText" TextWrapping="Wrap" FontSize="14" />
                         </Border>
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- 2. Bedtimes -->
-                <ScrollViewer x:Name="PageBedtimes" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
-                    <StackPanel Margin="36,28,36,28">
-                        <local:PageHeader Emoji="🛏️" EmojiColor="#C9D2FF" Title="Bedtimes" Subtitle="Pick when the bouncer starts its shift." />
-                        <TextBlock Style="{StaticResource Lead}" Text="When should your PC tuck you in? Tick the nights NightGuard should guard. Each night is named after the evening it starts, so a 12:30 AM bedtime on Monday night means early Tuesday morning." />
-                        <TextBlock x:Name="TimeHintText" Style="{StaticResource Hint}" Margin="0,0,0,12" />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="300" />
-                            </Grid.ColumnDefinitions>
-                            <Grid x:Name="NightsGrid" Grid.Column="0" Margin="0,0,24,0" />
-                            <Border Grid.Column="1" Style="{StaticResource Card}" VerticalAlignment="Top">
+                <!-- 1. Your why: the ritual -->
+                <ScrollViewer x:Name="PageWhy" Style="{StaticResource PageScroll}" Background="{StaticResource NgSkyBrush}">
+                    <Grid>
+                        <Canvas x:Name="WhySky" IsHitTestVisible="False" ClipToBounds="True" />
+                        <StackPanel Style="{StaticResource PageBody}" MaxWidth="900">
+                            <DockPanel Margin="0,0,0,22">
+                                <local:Owl DockPanel.Dock="Left" Width="92" Height="100" Margin="0,0,20,0" VerticalAlignment="Center" />
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock x:Name="WhyStep" Style="{StaticResource Overline}" />
+                                    <TextBlock Text="Why do you want your nights back?" Style="{StaticResource SerifTitle}" FontSize="38" />
+                                    <TextBlock Style="{StaticResource Lead}" Margin="0,8,0,0" Text="Take a quiet minute. This is the part that makes the rest work." />
+                                </StackPanel>
+                            </DockPanel>
+
+                            <Border Style="{StaticResource Card}" Background="#33181D45">
                                 <StackPanel>
-                                    <TextBlock Text="Set several nights at once" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,12" />
-                                    <TextBlock Text="Bedtime" Margin="0,0,0,4" />
-                                    <local:TimePicker x:Name="QuickBed" />
-                                    <TextBlock Text="Unlocks at" Margin="0,10,0,4" />
-                                    <local:TimePicker x:Name="QuickUnlock" />
-                                    <Button Content="Apply to every night" HorizontalAlignment="Stretch" Margin="0,16,0,6" Padding="8,7" Click="QuickAll_Click" />
-                                    <Button Content="School / work nights (Sun-Thu)" HorizontalAlignment="Stretch" Margin="0,0,0,6" Padding="8,7" Click="QuickWeek_Click" />
-                                    <Button Content="Weekend nights (Fri, Sat)" HorizontalAlignment="Stretch" Padding="8,7" Click="QuickWeekend_Click" />
+                                    <TextBlock Text="THE 60-SECOND RITUAL" Style="{StaticResource Overline}" />
+                                    <WrapPanel x:Name="RitualSteps" Margin="0,8,0,0" />
+                                    <TextBlock Style="{StaticResource Hint}" FontSize="12" Margin="0,6,0,0"
+                                               Text="Why it works: goals tied to your own values are the ones people stick with. If-then plans make people much more likely to follow through (a review of 94 studies, Gollwitzer and Sheeran, 2006). Writing down three good things lifts mood for months (Seligman and colleagues, 2005)." />
                                 </StackPanel>
                             </Border>
-                        </Grid>
-                        <TextBlock Style="{StaticResource Hint}" Margin="0,16,0,0" Text="Safety limits: a night can be at most 16 hours, and there must be at least 6 free hours between nights. NightGuard wants you asleep, not locked out of your own day." />
+
+                            <TextBlock Text="① My why" Style="{StaticResource H2}" Margin="0,10,0,10" />
+                            <TextBox x:Name="WhyBox" Style="{StaticResource JournalBox}" MaxLength="300" AcceptsReturn="False" MinHeight="90"
+                                     Tag="I want to... (one sentence about what you'll gain)" TextChanged="WhyBox_TextChanged" />
+                            <TextBlock x:Name="WhyCount" Style="{StaticResource Hint}" HorizontalAlignment="Right" />
+                            <TextBlock Text="Stuck? Borrow one:" Style="{StaticResource Hint}" Margin="0,4,0,8" />
+                            <WrapPanel x:Name="WhyIdeas" />
+
+                            <TextBlock Text="② My plan for the final call" Style="{StaticResource H2}" Margin="0,22,0,6" />
+                            <TextBlock Text="When the final call pops up, I will..." FontFamily="{StaticResource NgSerifText}" FontSize="18" FontStyle="Italic" Foreground="{StaticResource NgMuted}" Margin="0,0,0,10" />
+                            <TextBox x:Name="PlanBox" Style="{StaticResource JournalBox}" MaxLength="200" AcceptsReturn="False"
+                                     Tag="save, say gg, and stand up" TextChanged="WhyBox_TextChanged" />
+                            <WrapPanel x:Name="PlanIdeas" Margin="0,10,0,0" />
+
+                            <Border Style="{StaticResource Card}" Background="#33181D45" Margin="0,22,0,0">
+                                <StackPanel>
+                                    <CheckBox x:Name="CheckInCheck" Style="{StaticResource ToggleSwitch}" FontWeight="SemiBold" FontSize="15"
+                                              Content="③ Morning check-in: mood, three good things, streaks and badges" />
+                                    <TextBlock Style="{StaticResource Hint}" Margin="58,6,0,0" Text="Two minutes on your first sign-in each day. A little cheer for last night, your streak of clean nights, and a private journal you can read back any time. Skip it with one click." />
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="✦     ✦     ✦" HorizontalAlignment="Center" Foreground="{StaticResource NgMoon}" FontSize="16" Margin="0,18,0,18" />
+
+                            <TextBlock Text="I commit to..." Style="{StaticResource SerifTitle}" />
+                            <TextBlock Style="{StaticResource Lead}" Margin="0,6,0,16" Text="Pick how many nights you're in for. It's a promise to yourself, not a lock: when you get there, NightGuard throws you a party and asks if you want to go again." />
+                            <WrapPanel x:Name="CommitChoices" />
+                            <ToggleButton x:Name="ForeverCard" Style="{StaticResource ChoiceCard}" Margin="0,0,0,14" Padding="24,18" Click="CommitChoice_Click" Tag="0">
+                                <ToggleButton.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#2A2466" Offset="0" />
+                                        <GradientStop Color="#5A3E9E" Offset="0.7" />
+                                        <GradientStop Color="#8A4FA0" Offset="1" />
+                                    </LinearGradientBrush>
+                                </ToggleButton.Background>
+                                <DockPanel>
+                                    <local:Owl DockPanel.Dock="Right" Mood="Happy" Width="84" Height="92" Margin="12,0,30,0" />
+                                    <TextBlock DockPanel.Dock="Left" Text="∞" FontSize="78" FontWeight="Bold" Foreground="{StaticResource NgMoon}" VerticalAlignment="Center" Margin="0,-14,22,0" />
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Forever" FontFamily="{StaticResource NgSerif}" FontSize="36" Foreground="White" />
+                                        <TextBlock Text="No finish line. Just your new normal. 🌙" FontSize="15" Foreground="#E6FFFFFF" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </ToggleButton>
+                            <local:HoldButton x:Name="SignButton" Margin="0,6,0,8" />
+                            <TextBlock x:Name="CommitStateText" Style="{StaticResource Hint}" />
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
+
+                <!-- 2. Bedtimes -->
+                <ScrollViewer x:Name="PageBedtimes" Style="{StaticResource PageScroll}">
+                    <StackPanel Style="{StaticResource PageBody}">
+                        <local:PageHeader x:Name="HeadBedtimes" Emoji="🛏️" EmojiColor="#C9D2FF" Title="Bedtimes" Subtitle="Pick when the bouncer starts its shift. Each night is named after the evening it starts, so a 12:30 AM bedtime on Monday night means early Tuesday." />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Quick set" Style="{StaticResource H2}" />
+                                <WrapPanel>
+                                    <StackPanel Margin="0,0,24,12">
+                                        <TextBlock Text="Bedtime" Style="{StaticResource Hint}" Margin="0,0,0,6" />
+                                        <local:TimePicker x:Name="QuickBed" />
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,24,12">
+                                        <TextBlock Text="Unlocks at" Style="{StaticResource Hint}" Margin="0,0,0,6" />
+                                        <local:TimePicker x:Name="QuickUnlock" />
+                                    </StackPanel>
+                                    <WrapPanel VerticalAlignment="Bottom" Margin="0,0,0,12">
+                                        <Button Content="Every night" Style="{StaticResource ChunkyButton}" Margin="0,0,8,0" Click="QuickAll_Click" />
+                                        <Button Content="Sun to Thu" Style="{StaticResource ChunkyButton}" Margin="0,0,8,0" Click="QuickWeek_Click" />
+                                        <Button Content="Fri and Sat" Style="{StaticResource ChunkyButton}" Click="QuickWeekend_Click" />
+                                    </WrapPanel>
+                                </WrapPanel>
+                                <TextBlock x:Name="TimeHintText" Style="{StaticResource Hint}" />
+                            </StackPanel>
+                        </Border>
+                        <WrapPanel x:Name="NightsPanel" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,8,0,0" Text="Safety limits: a night can be at most 16 hours, and there must be at least 6 free hours between nights. NightGuard wants you asleep, not locked out of your own day." />
                     </StackPanel>
                 </ScrollViewer>
 
                 <!-- 3. Warnings -->
-                <ScrollViewer x:Name="PageWarnings" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
-                    <StackPanel Margin="36,28,36,28">
-                        <local:PageHeader Emoji="⏰" EmojiColor="#FFD0B0" Title="Warnings" Subtitle="Friendly nudges first. Then less friendly ones. 😅" />
-                        <TextBlock Style="{StaticResource Lead}" Text="Popups that nudge you before bedtime: gentle at first, then less gentle. Tick the ones you want (up to 6), and click Preview to see exactly how each one looks." />
-                        <Grid x:Name="WarningsGrid" />
-                        <Grid Margin="0,18,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="280" />
-                            </Grid.ColumnDefinitions>
-                            <Border Style="{StaticResource Card}" Margin="0,0,20,0">
+                <ScrollViewer x:Name="PageWarnings" Style="{StaticResource PageScroll}">
+                    <StackPanel Style="{StaticResource PageBody}">
+                        <local:PageHeader x:Name="HeadWarnings" Emoji="⏰" EmojiColor="#FFD0B0" Title="Warnings" Subtitle="Friendly nudges first. Then less friendly ones. Switch on the ones you want, and pick when they pop up." />
+                        <WrapPanel x:Name="WarningsPanel" />
+                        <Border Style="{StaticResource Card}">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="👀  Preview the countdown" Style="{StaticResource ChunkyButton}" Click="PreviewCountdown_Click" VerticalAlignment="Center" Margin="16,0,0,0" />
                                 <StackPanel>
-                                    <TextBlock Text="How to write a popup that actually works on you" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,8" />
-                                    <TextBlock TextWrapping="Wrap" LineHeight="21">
-                                        These words fill themselves in: <Bold>{minutes}</Bold> minutes left, <Bold>{bedtime}</Bold> bedtime,
-                                        <Bold>{action}</Bold> what happens (like "hibernate"), <Bold>{unlock}</Bold> when the PC unlocks.
-                                        Type <Bold>\n</Bold> to start a new line.<LineBreak /><LineBreak />
-                                        • Keep it short: one line of news, one line of what to do.<LineBreak />
-                                        • Start kind and get firmer. Future you responds better to a plan than a lecture.<LineBreak />
-                                        • 30 min before: Heads up! Bedtime in {minutes} minutes.\nWrap up this round.<LineBreak />
-                                        • 5 min before: FINAL WARNING!\nThe PC will {action} at {bedtime}. Save NOW.
-                                    </TextBlock>
+                                    <TextBlock Text="Then, at bedtime: the countdown" Style="{StaticResource H2}" />
+                                    <TextBlock Style="{StaticResource Hint}" Text="The last thing you see before the PC does its thing, with your why on it. You set its length on the next step." />
                                 </StackPanel>
-                            </Border>
-                            <StackPanel Grid.Column="1">
-                                <Button Content="Fill in example messages" HorizontalAlignment="Stretch" Padding="8,8" Margin="0,0,0,8" Click="Examples_Click" />
-                                <Button Content="Preview the bedtime countdown" HorizontalAlignment="Stretch" Padding="8,8" Click="PreviewCountdown_Click" />
-                                <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0" Text="The countdown is the last window you see at bedtime, right before the PC does its thing. Its length is set on the next step." />
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <!-- 4. At bedtime -->
-                <ScrollViewer x:Name="PageAction" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
-                    <StackPanel Margin="36,28,36,28" MaxWidth="900" HorizontalAlignment="Left">
-                        <local:PageHeader Emoji="🔌" EmojiColor="#E0D0FF" Title="At bedtime" Subtitle="Time's up. How should your PC say goodnight?" />
-                        <TextBlock Style="{StaticResource Lead}" Text="Bedtime has arrived. Your game disagrees. Here's how NightGuard settles the argument." />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Style="{StaticResource Label}" Text="At bedtime the PC will" />
-                            <StackPanel Grid.Column="1">
-                                <ComboBox x:Name="ActionBox" Width="200" HorizontalAlignment="Left" SelectionChanged="ActionBox_SelectionChanged" />
-                                <TextBlock x:Name="ActionDesc" Style="{StaticResource Hint}" Margin="0,6,0,16" />
-                            </StackPanel>
-                            <TextBlock Grid.Row="1" Style="{StaticResource Label}" Text="Countdown (seconds)" />
-                            <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,14">
-                                <local:IntBox x:Name="CountdownBox" Min="15" Max="600" />
-                                <TextBlock Style="{StaticResource Hint}" Text="Last call: time to hit Save before it happens (15 to 600 seconds)." />
-                            </StackPanel>
-                            <TextBlock Grid.Row="2" Style="{StaticResource Label}" Text="Repeat every (minutes)" />
-                            <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,14">
-                                <local:IntBox x:Name="RecheckBox" Min="1" Max="60" />
-                                <TextBlock Style="{StaticResource Hint}" Text="Switched the PC back on at night? Nice try. It happens again this often." />
-                            </StackPanel>
-                            <TextBlock Grid.Row="3" Style="{StaticResource Label}" Text="Night mode (minutes)" />
-                            <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,0,0,14">
-                                <local:IntBox x:Name="NightModeBox" Min="0" Max="240" />
-                                <TextBlock Style="{StaticResource Hint}" Text="Settings and uninstall are locked from this long before bedtime until unlock." />
-                            </StackPanel>
-                            <TextBlock Grid.Row="4" Style="{StaticResource Label}" Text="End date" VerticalAlignment="Top" Margin="0,4,12,0" />
-                            <StackPanel Grid.Row="4" Grid.Column="1">
-                                <StackPanel Orientation="Horizontal">
-                                    <CheckBox x:Name="EndDateCheck" Content="Stop after this last locked night:" VerticalAlignment="Center" Checked="EndDate_Changed" Unchecked="EndDate_Changed" />
-                                    <DatePicker x:Name="EndDatePicker" Width="170" Margin="12,0,0,0" IsEnabled="False" SelectedDateFormat="Long" />
-                                </StackPanel>
-                                <TextBlock Style="{StaticResource Hint}" Text="Trying it out for a month? After that night, NightGuard removes itself completely. Heads up: with an end date it can't be uninstalled before it, and the date can't be moved earlier. One-night trial? Pick today." />
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <!-- 5. Your why and journal -->
-                <ScrollViewer x:Name="PageWhy" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
-                    <StackPanel Margin="36,28,36,28" MaxWidth="900" HorizontalAlignment="Left">
-                        <local:PageHeader Emoji="💬" EmojiColor="#BFEFFF" Title="Why are you doing this?" Subtitle="The one sentence that beats &quot;just one more game&quot;." />
-                        <TextBlock Style="{StaticResource Lead}" Text="Optional, but we HIGHLY recommend it. Write one or two sentences to future you. At 11:55 PM, mid-game, &quot;be healthier&quot; is easy to ignore. &quot;I want to stop being a zombie at work&quot; hits different. NightGuard shows it in the final warning, the bedtime countdown and your morning check-in." />
-                        <TextBox x:Name="WhyBox" MaxLength="300" Height="80" TextWrapping="Wrap" AcceptsReturn="False" FontSize="16" TextChanged="WhyBox_TextChanged" />
-                        <TextBlock x:Name="WhyCount" Style="{StaticResource Hint}" />
-                        <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0" Text="Need ideas?   &quot;I want to wake up without hating my alarm.&quot;   &quot;My grades are worth more than my rank.&quot;   &quot;I promised my kids I'd have energy on weekends.&quot;   &quot;I'm tired of being tired.&quot;   &quot;3 AM me makes bad decisions.&quot;" />
-                        <Border Style="{StaticResource Card}" Margin="0,24,0,0">
-                            <StackPanel>
-                                <CheckBox x:Name="CheckInCheck" Content="Morning check-in, streaks and badges (recommended)" FontWeight="SemiBold" />
-                                <TextBlock Style="{StaticResource Hint}" Margin="28,6,0,0" Text="On your first sign-in each day: a little cheer for last night and your streak of clean nights (off before bedtime, no bouncer needed). Earn badges from night 1 all the way to a full year. Log an optional mood and note for your private journal, or skip with one click. Read it back any time under My journal." />
-                            </StackPanel>
+                            </DockPanel>
                         </Border>
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- 6. Game and screen time -->
-                <ScrollViewer x:Name="PageScreen" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
-                    <StackPanel Margin="36,28,36,28">
-                        <local:PageHeader Emoji="🎮" EmojiColor="#C8F2C8" Title="Game and screen time" Subtitle="&quot;Just one more game&quot; now comes with a budget." />
-                        <DockPanel Margin="0,0,0,14">
-                            <TextBlock x:Name="UsageText" DockPanel.Dock="Right" FontFamily="Consolas" TextWrapping="Wrap" MaxWidth="420" Opacity="0.85" />
-                            <CheckBox x:Name="ScreenCheck" Content="Turn on daily game and screen time budgets" FontWeight="SemiBold" FontSize="15"
-                                      Checked="Section_Changed" Unchecked="Section_Changed" VerticalAlignment="Top" />
-                        </DockPanel>
+                <!-- 4. At bedtime -->
+                <ScrollViewer x:Name="PageAction" Style="{StaticResource PageScroll}">
+                    <StackPanel Style="{StaticResource PageBody}">
+                        <local:PageHeader x:Name="HeadAction" Emoji="🌙" EmojiColor="#E0D0FF" Title="At bedtime" Subtitle="Bedtime has arrived. Your game disagrees. Here's how NightGuard settles the argument." />
+                        <TextBlock Text="When time's up, the PC will..." Style="{StaticResource H2}" Margin="0,0,0,12" />
+                        <WrapPanel x:Name="ActionsPanel" />
+                        <TextBlock Text="Last call before it happens" Style="{StaticResource H2}" Margin="0,12,0,4" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,10" Text="A full-screen countdown with a &quot;Let me save first&quot; button." />
+                        <local:PillPicker x:Name="CountdownPills" />
+                        <Expander Header="More options" Margin="0,18,0,0" FontSize="14">
+                            <StackPanel Margin="4,12,0,4">
+                                <TextBlock Text="Switched the PC back on at night? Do it again every" Style="{StaticResource Label}" />
+                                <local:PillPicker x:Name="RecheckPills" />
+                                <TextBlock Text="Lock NightGuard's settings this long before bedtime (night mode)" Style="{StaticResource Label}" Margin="0,14,0,8" />
+                                <local:PillPicker x:Name="NightModePills" />
+                                <TextBlock Style="{StaticResource Hint}" Text="Night mode stops tired-you from loosening the rules at 11:58 PM. It lasts until the PC unlocks in the morning." />
+                            </StackPanel>
+                        </Expander>
+                        <Border x:Name="LegacyEndCard" Style="{StaticResource Card}" Margin="0,20,0,0" Visibility="Collapsed">
+                            <TextBlock x:Name="LegacyEndText" TextWrapping="Wrap" FontSize="14" />
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- 5. Game and screen time -->
+                <ScrollViewer x:Name="PageScreen" Style="{StaticResource PageScroll}">
+                    <StackPanel Style="{StaticResource PageBody}">
+                        <local:PageHeader x:Name="HeadScreen" Emoji="🎮" EmojiColor="#C8F2C8" Title="Game and screen time" Subtitle="&quot;Just one more game&quot; now comes with a budget. Optional." />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <CheckBox x:Name="ScreenCheck" Style="{StaticResource ToggleSwitch}" Content="Daily game and screen time budgets" FontWeight="SemiBold" FontSize="16"
+                                          Checked="Section_Changed" Unchecked="Section_Changed" />
+                                <TextBlock x:Name="UsageText" Style="{StaticResource Hint}" Margin="58,6,0,0" />
+                            </StackPanel>
+                        </Border>
                         <StackPanel x:Name="ScreenBody">
-                            <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,10" Text="&quot;Just one more game&quot; ends here. Minutes per day (0 = no limit)." />
+                            <TextBlock Text="Minutes per day (0 means no limit)" Style="{StaticResource H2}" Margin="0,6,0,12" />
                             <WrapPanel>
-                                <StackPanel Margin="0,0,28,10"><TextBlock Text="Games, weekdays" /><local:IntBox x:Name="GameWd" Min="0" Max="1440" /></StackPanel>
-                                <StackPanel Margin="0,0,28,10"><TextBlock Text="Games, weekends" /><local:IntBox x:Name="GameWe" Min="0" Max="1440" /></StackPanel>
-                                <StackPanel Margin="0,0,28,10"><TextBlock Text="Screen, weekdays" /><local:IntBox x:Name="ScreenWd" Min="0" Max="1440" /></StackPanel>
-                                <StackPanel Margin="0,0,28,10"><TextBlock Text="Screen, weekends" /><local:IntBox x:Name="ScreenWe" Min="0" Max="1440" /></StackPanel>
-                                <StackPanel Margin="0,0,28,10"><TextBlock Text="New day starts at (hour)" /><local:IntBox x:Name="ResetHour" Min="0" Max="23" /></StackPanel>
+                                <Border Style="{StaticResource TileCard}" Width="250"><StackPanel><TextBlock Text="🎮 Games, weekdays" Style="{StaticResource Label}" /><local:IntBox x:Name="GameWd" Min="0" Max="1440" Step="15" Suffix="min" /></StackPanel></Border>
+                                <Border Style="{StaticResource TileCard}" Width="250"><StackPanel><TextBlock Text="🎮 Games, weekends" Style="{StaticResource Label}" /><local:IntBox x:Name="GameWe" Min="0" Max="1440" Step="15" Suffix="min" /></StackPanel></Border>
+                                <Border Style="{StaticResource TileCard}" Width="250"><StackPanel><TextBlock Text="🖥️ Screen, weekdays" Style="{StaticResource Label}" /><local:IntBox x:Name="ScreenWd" Min="0" Max="1440" Step="15" Suffix="min" /></StackPanel></Border>
+                                <Border Style="{StaticResource TileCard}" Width="250"><StackPanel><TextBlock Text="🖥️ Screen, weekends" Style="{StaticResource Label}" /><local:IntBox x:Name="ScreenWe" Min="0" Max="1440" Step="15" Suffix="min" /></StackPanel></Border>
                             </WrapPanel>
-                            <WrapPanel Margin="0,6,0,0">
-                                <StackPanel Margin="0,0,28,10">
-                                    <TextBlock Text="When screen time runs out" />
-                                    <ComboBox x:Name="LimitAction" Width="160" SelectionChanged="LimitAction_SelectionChanged" />
-                                </StackPanel>
-                                <StackPanel Margin="0,0,28,10"><TextBlock Text="Shutdown notice (min)" /><local:IntBox x:Name="GraceBox" Min="1" Max="10" /></StackPanel>
-                                <StackPanel Margin="0,0,28,10"><TextBlock Text="Warn at (minutes left)" /><TextBox x:Name="WarnAtBox" Width="160" /></StackPanel>
-                                <CheckBox x:Name="LaunchersCheck" Content="Also close game launchers" VerticalAlignment="Bottom" Margin="0,0,0,14" />
-                            </WrapPanel>
-                            <Grid Margin="0,8,0,0" Height="250">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="2*" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <DockPanel Margin="0,0,10,0"><TextBlock DockPanel.Dock="Top" Text="Game folders (one per line)" Margin="0,0,0,4" />
-                                    <TextBox x:Name="GameFolders" AcceptsReturn="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" /></DockPanel>
-                                <DockPanel Grid.Column="1" Margin="0,0,10,0"><TextBlock DockPanel.Dock="Top" Text="Extra games (program names)" Margin="0,0,0,4" />
-                                    <TextBox x:Name="GameProcs" AcceptsReturn="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" /></DockPanel>
-                                <DockPanel Grid.Column="2" Margin="0,0,10,0"><TextBlock DockPanel.Dock="Top" Text="Never count as games" Margin="0,0,0,4" />
-                                    <TextBox x:Name="IgnoreProcs" AcceptsReturn="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" /></DockPanel>
-                                <DockPanel Grid.Column="3"><TextBlock DockPanel.Dock="Top" Text="Launchers" Margin="0,0,0,4" />
-                                    <TextBox x:Name="LauncherProcs" AcceptsReturn="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" /></DockPanel>
-                            </Grid>
-                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                                <Button Content="Add folder..." Padding="12,6" Click="AddGameFolder_Click" />
-                                <TextBlock Style="{StaticResource Hint}" Margin="14,0,0,0" VerticalAlignment="Center" MaxWidth="700"
-                                           Text="Anything running from a game folder counts as a game. Program names are as in Task Manager > Details, without .exe. Windows' own programs are never closed." />
-                            </StackPanel>
-                        </StackPanel>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <!-- 7. Block sites and apps -->
-                <ScrollViewer x:Name="PageBlock" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
-                    <StackPanel Margin="36,28,36,28">
-                        <local:PageHeader Emoji="🚫" EmojiColor="#FFC2C2" Title="Block sites and apps" Subtitle="Goodbye, 1 AM doomscrolling. 👋" />
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                            <CheckBox x:Name="BlockCheck" Content="Turn on site and app blocking (goodbye, 1 AM doomscrolling)" FontWeight="SemiBold" FontSize="15"
-                                      Checked="Section_Changed" Unchecked="Section_Changed" />
-                        </StackPanel>
-                        <Grid x:Name="BlockBody">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="280" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Margin="0,0,24,0">
-                                <CheckBox x:Name="BlockBedtimeCheck" Content="Block during bedtime hours" Margin="0,0,0,12" />
-                                <TextBlock Text="Websites (one per line)" Margin="0,0,0,4" />
-                                <TextBox x:Name="SitesBox" Height="300" AcceptsReturn="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" />
-                                <Button Content="Add social media list" HorizontalAlignment="Stretch" Padding="8,6" Margin="0,8,0,0" Click="SocialPreset_Click" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="Apps (their internet is blocked)" Margin="0,0,0,4" />
-                                <DockPanel Height="140">
-                                    <StackPanel DockPanel.Dock="Right" Margin="10,0,0,0" Width="140">
-                                        <Button Content="Add program..." HorizontalAlignment="Stretch" Padding="8,6" Margin="0,0,0,6" Click="AddApp_Click" />
-                                        <Button Content="Add folder..." HorizontalAlignment="Stretch" Padding="8,6" Margin="0,0,0,6" Click="AddAppFolder_Click" />
-                                        <Button Content="Remove" HorizontalAlignment="Stretch" Padding="8,6" Click="RemoveApp_Click" />
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="When screen time runs out" Style="{StaticResource Label}" />
+                                    <local:PillPicker x:Name="LimitPills" />
+                                    <StackPanel x:Name="GracePanel" Orientation="Horizontal" Margin="0,6,0,0">
+                                        <TextBlock Text="Shutdown notice" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                        <local:IntBox x:Name="GraceBox" Min="1" Max="10" Suffix="min" />
                                     </StackPanel>
-                                    <ListBox x:Name="AppsList" />
-                                </DockPanel>
-                                <TextBlock Text="Also block at these times (a slot like 10 PM to 2 AM crosses midnight)" FontWeight="SemiBold" Margin="0,18,0,8" />
-                                <Grid x:Name="SlotsGrid" />
-                                <TextBlock Style="{StaticResource Hint}" Margin="0,14,0,0" Text="Sites are blocked in a marked section of the Windows hosts file; apps with Windows Firewall rules named 'NightGuard'. Both are removed automatically when the time slot ends, on uninstall, and if anything goes wrong. Browsers with 'secure DNS' turned on can get around site blocking (see the README). Blocking an app cuts its internet; it does not close it." />
-                            </StackPanel>
-                        </Grid>
+                                    <TextBlock Text="Warn me when this much is left" Style="{StaticResource Label}" Margin="0,18,0,8" />
+                                    <local:MultiPills x:Name="WarnAtPills" />
+                                    <WrapPanel Margin="0,12,0,0">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,28,8">
+                                            <TextBlock Text="A new day starts at" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                            <local:IntBox x:Name="ResetHour" Min="0" Max="23" Suffix=":00" />
+                                        </StackPanel>
+                                        <CheckBox x:Name="LaunchersCheck" Style="{StaticResource ToggleSwitch}" Content="Also close game launchers" Margin="0,0,0,8" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                            <Expander Header="Fine-tune what counts as a game" FontSize="14">
+                                <StackPanel Margin="4,12,0,4">
+                                    <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,10" Text="Anything running from a game folder counts as a game. Program names are as in Task Manager > Details, without .exe, one per line. Windows' own programs are never closed." />
+                                    <UniformGrid Columns="2">
+                                        <DockPanel Margin="0,0,10,12" Height="170"><TextBlock DockPanel.Dock="Top" Text="Game folders" Style="{StaticResource Label}" /><TextBox x:Name="GameFolders" Style="{StaticResource ListText}" /></DockPanel>
+                                        <DockPanel Margin="0,0,0,12" Height="170"><TextBlock DockPanel.Dock="Top" Text="Extra games" Style="{StaticResource Label}" /><TextBox x:Name="GameProcs" Style="{StaticResource ListText}" /></DockPanel>
+                                        <DockPanel Margin="0,0,10,12" Height="170"><TextBlock DockPanel.Dock="Top" Text="Never count as games" Style="{StaticResource Label}" /><TextBox x:Name="IgnoreProcs" Style="{StaticResource ListText}" /></DockPanel>
+                                        <DockPanel Margin="0,0,0,12" Height="170"><TextBlock DockPanel.Dock="Top" Text="Launchers" Style="{StaticResource Label}" /><TextBox x:Name="LauncherProcs" Style="{StaticResource ListText}" /></DockPanel>
+                                    </UniformGrid>
+                                    <Button Content="📁  Add a game folder..." Style="{StaticResource ChunkyButton}" HorizontalAlignment="Left" Click="AddGameFolder_Click" />
+                                </StackPanel>
+                            </Expander>
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- 8. Trusted person -->
-                <ScrollViewer x:Name="PageTrusted" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
-                    <StackPanel Margin="36,28,36,28" MaxWidth="900" HorizontalAlignment="Left">
-                        <local:PageHeader Emoji="🔐" EmojiColor="#FFE9A8" Title="Trusted person" Subtitle="Know yourself too well? Hand the off switch to someone else." />
-                        <TextBlock Style="{StaticResource Lead}" Text="Know yourself too well? Hand the off switch to someone else. A trusted person (parent, partner, friend, the roommate who's tired of hearing you game at 3 AM) sets a secret 8-digit code. After that, changing settings or uninstalling needs their code." />
-                        <CheckBox x:Name="TrustCheck" Content="Use a trusted-person code" FontWeight="SemiBold" FontSize="15" Checked="TrustCheck_Changed" Unchecked="TrustCheck_Changed" />
-                        <TextBlock x:Name="TrustState" TextWrapping="Wrap" Margin="0,10,0,0" FontSize="14" />
-                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                            <TextBlock Text="Trusted person's name (optional):" VerticalAlignment="Center" Margin="0,0,12,0" />
-                            <TextBox x:Name="ContactBox" Width="280" MaxLength="60" />
+                <!-- 6. Block sites and apps -->
+                <ScrollViewer x:Name="PageBlock" Style="{StaticResource PageScroll}">
+                    <StackPanel Style="{StaticResource PageBody}">
+                        <local:PageHeader x:Name="HeadBlock" Emoji="🚫" EmojiColor="#FFC2C2" Title="Block sites and apps" Subtitle="Goodbye, 1 AM doomscrolling. Optional." />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <CheckBox x:Name="BlockCheck" Style="{StaticResource ToggleSwitch}" Content="Block sites and apps" FontWeight="SemiBold" FontSize="16"
+                                          Checked="Section_Changed" Unchecked="Section_Changed" />
+                                <CheckBox x:Name="BlockBedtimeCheck" Style="{StaticResource ToggleSwitch}" Content="During bedtime hours" Margin="0,14,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <StackPanel x:Name="BlockBody">
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Button DockPanel.Dock="Right" Content="+ Social media list" Style="{StaticResource Chip}" Click="SocialPreset_Click" Margin="0" />
+                                        <TextBlock Text="🌐 Websites (one per line)" Style="{StaticResource H2}" />
+                                    </DockPanel>
+                                    <TextBox x:Name="SitesBox" Style="{StaticResource ListText}" Height="170" />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="📦 Apps (their internet is cut, they aren't closed)" Style="{StaticResource H2}" />
+                                    <ListBox x:Name="AppsList" Height="120" Margin="0,4,0,10" />
+                                    <WrapPanel>
+                                        <Button Content="+ Program..." Style="{StaticResource ChunkyButton}" Margin="0,0,8,0" Click="AddApp_Click" />
+                                        <Button Content="+ Folder..." Style="{StaticResource ChunkyButton}" Margin="0,0,8,0" Click="AddAppFolder_Click" />
+                                        <Button Content="Remove" Style="{StaticResource ChunkyButton}" Click="RemoveApp_Click" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="⏱️ Also block at these times" Style="{StaticResource H2}" Margin="0,6,0,4" />
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,12" Text="A slot like 10 PM to 2 AM crosses midnight." />
+                            <WrapPanel x:Name="SlotsPanel" />
+                            <TextBlock Style="{StaticResource Hint}" Text="Sites are blocked in a marked section of the Windows hosts file; apps with Windows Firewall rules named 'NightGuard'. Both are removed automatically when the time slot ends, on uninstall, and if anything goes wrong. Browsers with 'secure DNS' turned on can get around site blocking (see the README)." />
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                            <Button x:Name="ChangeCodeButton" Content="Trusted person: change the code..." Padding="12,7" Margin="0,0,10,0" Click="ChangeCode_Click" />
-                            <Button x:Name="TrustOffButton" Content="Turn off..." Padding="12,7" Click="TrustOff_Click" />
-                        </StackPanel>
-                        <Border Style="{StaticResource Card}" Margin="0,22,0,0" BorderBrush="{StaticResource NgRed}">
-                            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource NgRed}" FontWeight="SemiBold" LineHeight="21">
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- 7. Trusted person -->
+                <ScrollViewer x:Name="PageTrusted" Style="{StaticResource PageScroll}">
+                    <StackPanel Style="{StaticResource PageBody}">
+                        <local:PageHeader x:Name="HeadTrusted" Emoji="🔐" EmojiColor="#FFE9A8" Title="Trusted person" Subtitle="Know yourself too well? Hand the off switch to someone else. Optional." />
+                        <TextBlock Style="{StaticResource Lead}" Text="A trusted person (parent, partner, friend, the roommate who's tired of hearing you game at 3 AM) sets a secret 8-digit code. After that, changing settings or uninstalling needs their code." />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <CheckBox x:Name="TrustCheck" Style="{StaticResource ToggleSwitch}" Content="Use a trusted-person code" FontWeight="SemiBold" FontSize="16" Checked="TrustCheck_Changed" Unchecked="TrustCheck_Changed" />
+                                <TextBlock x:Name="TrustState" TextWrapping="Wrap" Margin="0,12,0,0" FontSize="14" />
+                                <TextBlock Text="Their name (optional)" Style="{StaticResource Label}" Margin="0,16,0,6" />
+                                <TextBox x:Name="ContactBox" MaxWidth="360" HorizontalAlignment="Left" Width="360" MaxLength="60" />
+                                <WrapPanel Margin="0,16,0,0">
+                                    <Button x:Name="ChangeCodeButton" Content="Trusted person: change the code..." Style="{StaticResource ChunkyButton}" Margin="0,0,10,0" Click="ChangeCode_Click" />
+                                    <Button x:Name="TrustOffButton" Content="Turn off..." Style="{StaticResource ChunkyButton}" Click="TrustOff_Click" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource DangerCard}">
+                            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource NgRed}" FontWeight="SemiBold" LineHeight="21" FontSize="14">
                                 WARNING: THERE IS NO WAY TO RECOVER A LOST CODE.<LineBreak />
                                 The trusted person types the code in themselves, twice, and it is never shown, emailed or printed. This PC keeps only a scrambled copy. If they forget it, settings and uninstall stay locked for good.<LineBreak />
                                 Wrong codes lock the code box for 15 minutes after 5 tries, and longer after each further try.<LineBreak /><LineBreak />
-                                (NightGuard still never stops the PC working outside bedtime hours, and the end date still removes it.)
+                                (NightGuard still never stops the PC working outside bedtime hours.)
                             </TextBlock>
                         </Border>
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- 9. Review and save -->
-                <DockPanel x:Name="PageReview" Visibility="Collapsed" Margin="36,28,36,18">
-                    <StackPanel DockPanel.Dock="Top">
-                        <local:PageHeader Emoji="✅" EmojiColor="#C3F2DB" Title="Last stop: review and save" Subtitle="Check it twice. Then go be well-rested. ✨" />
-                        <TextBlock Style="{StaticResource Lead}" Text="Check it twice: once NightGuard is running, stricter changes are instant, but looser ones and uninstalling need a 7-day cool-off." />
+                <!-- 8. Review -->
+                <ScrollViewer x:Name="PageReview" Style="{StaticResource PageScroll}">
+                    <StackPanel Style="{StaticResource PageBody}">
+                        <local:PageHeader x:Name="HeadReview" Emoji="✅" EmojiColor="#C3F2DB" Title="Here's your night plan" Subtitle="Check it twice: once NightGuard is running, stricter changes are instant, but looser ones and uninstalling need a 7-day cool-off." />
+                        <Border x:Name="ErrorCard" Style="{StaticResource DangerCard}" Visibility="Collapsed">
+                            <StackPanel>
+                                <TextBlock Text="⚠️  Please fix these first" Style="{StaticResource H2}" Foreground="{StaticResource NgRed}" />
+                                <TextBlock x:Name="ErrorText" TextWrapping="Wrap" FontSize="14" LineHeight="21" />
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="LooseCard" Style="{StaticResource Card}" BorderBrush="{StaticResource NgOrange}" Visibility="Collapsed">
+                            <StackPanel>
+                                <TextBlock x:Name="LooseTitle" Style="{StaticResource H2}" Foreground="{StaticResource NgOrange}" />
+                                <TextBlock x:Name="LooseText" TextWrapping="Wrap" FontSize="14" LineHeight="21" />
+                            </StackPanel>
+                        </Border>
+                        <WrapPanel x:Name="ReviewCards" />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <CheckBox x:Name="DesktopCheck" Style="{StaticResource ToggleSwitch}" Content="Put a NightGuard shortcut on the desktop" />
+                                <TextBlock Style="{StaticResource Hint}" Margin="58,4,0,0" Text="It's always in the Start Menu. Windows doesn't let apps pin themselves, so right-click it there and choose Pin to taskbar." />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}" BorderBrush="{StaticResource NgMoon}">
+                            <CheckBox x:Name="ConfirmCheck" Style="{StaticResource ToggleSwitch}" Content="Yes, this is my plan. Let's do this! 💪" FontWeight="Bold" FontSize="17"
+                                      Checked="ConfirmCheck_Changed" Unchecked="ConfirmCheck_Changed" />
+                        </Border>
                     </StackPanel>
-                    <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
-                        <CheckBox x:Name="DesktopCheck" Content="Also put a NightGuard shortcut on the desktop (it's always in the Start Menu)" />
-                        <TextBlock Style="{StaticResource Hint}" Text="Taskbar: Windows doesn't let apps pin themselves, so right-click NightGuard in the Start Menu > Pin to taskbar." />
-                        <CheckBox x:Name="ConfirmCheck" Content="Yes, these settings are correct. Let's do this! &#x1F4AA;" FontWeight="SemiBold" FontSize="15" Margin="0,14,0,0"
-                                  Checked="ConfirmCheck_Changed" Unchecked="ConfirmCheck_Changed" />
-                    </StackPanel>
-                    <TextBox x:Name="ReviewBox" IsReadOnly="True" FontSize="14" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
-                </DockPanel>
+                </ScrollViewer>
             </Grid>
         </DockPanel>
     </Grid>

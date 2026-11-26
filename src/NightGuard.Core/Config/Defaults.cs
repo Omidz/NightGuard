@@ -78,6 +78,30 @@ public static class Defaults
         (0, @"FINAL WARNING!\nThe PC will {action} at {bedtime}. Save NOW.\nFuture you says thanks."),
     ];
 
+    /// <summary>
+    /// The three warning cards in the app. Each one has a fixed, pre-written message; people can add
+    /// their own words below it (saved after a blank line), but never have to type placeholders.
+    /// </summary>
+    public sealed record WarningPreset(string Key, string Name, string Emoji, int[] Minutes, int DefaultMinutes, string Message, string Blurb);
+
+    public static readonly WarningPreset[] WarningPresets =
+    [
+        new("heads-up", "Heads-up", "\U0001F989", [60, 45, 30, 20], 30,
+            @"Heads up! Bedtime in {minutes} minutes.\nThe PC will {action} at {bedtime}. Time to start wrapping up.",
+            "A gentle hoot. Finish this match, don't start a new one."),
+        new("wrap-up", "Wrap-up", "⏳", [15, 10], 10,
+            @"{minutes} minutes to go.\nFinish this round and save your stuff. No starting new ones. Yes, we know.",
+            "Save your stuff, say gg, start winding down."),
+        new("final", "Final call", "\U0001F6A8", [5, 3, 2, 1], 5,
+            @"FINAL CALL!\nThe PC will {action} at {bedtime}. Save NOW.\nFuture you says thanks.",
+            "Last chance to save. Your why and your plan show up here too."),
+    ];
+
+    /// <summary>Which card a warning belongs to, by how early it comes.</summary>
+    public static int PresetIndex(int minutesBefore) => minutesBefore >= 20 ? 0 : minutesBefore > 5 ? 1 : 2;
+
+    public const string CustomSeparator = @"\n\n";
+
     public static Dictionary<string, NightSchedule> NewSchedule()
     {
         var d = new Dictionary<string, NightSchedule>(StringComparer.OrdinalIgnoreCase);
@@ -86,10 +110,7 @@ public static class Defaults
     }
 
     public static List<WarningSetting> NewWarnings() =>
-    [
-        new() { MinutesBefore = 30, Sound = true, Message = Warning30 },
-        new() { MinutesBefore = 5, Sound = true, Message = Warning5 },
-    ];
+        WarningPresets.Select(p => new WarningSetting { MinutesBefore = p.DefaultMinutes, Sound = true, Message = p.Message }).ToList();
 
     public static int DayIndex(DateTime date) => ((int)date.DayOfWeek + 6) % 7;
     public static string DayKey(DateTime date) => Days[DayIndex(date)];

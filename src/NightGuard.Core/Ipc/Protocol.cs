@@ -123,6 +123,9 @@ public sealed class StatusInfo
     public int Streak { get; set; }
     public int BestStreak { get; set; }
     public string Why { get; set; } = "";
+    public string Plan { get; set; } = "";
+    public int? CommitNights { get; set; }
+    public string? CommitStart { get; set; }
     public bool Uninstalling { get; set; }
 }
 
@@ -133,6 +136,9 @@ public sealed class CheckInInfo
     public int Streak { get; set; }
     public int Best { get; set; }
     public string Why { get; set; } = "";
+    public string Plan { get; set; } = "";
+    public int? CommitNights { get; set; }
+    public string? CommitStart { get; set; }
 }
 
 public static class AgentEventKinds
