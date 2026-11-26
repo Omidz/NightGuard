@@ -12,7 +12,7 @@ NightGuard warns you before bedtime, then **powers your PC off** (hibernate by d
 
 - ⏰ **Warns you** before bedtime (30 and 5 minutes by default). Popups, sound, custom messages, the works.
 - 🔌 **Enforces bedtime.** Shutdown, sleep, hibernate, lock or sign out, with a short countdown so you can save.
-- 🔁 **Doesn't fall for tricks.** Turn the PC back on during the night? It checks every minute and at every startup.
+- 🔁 **Doesn't fall for tricks.** Turn the PC back on during the night? It checks every minute, at every startup and every time the PC wakes up. Cancel the shutdown with `shutdown /a`? It shuts down anyway. Close the countdown window? It locks anyway. "Move" to Hawaii in the time zone settings at 11:59 PM? Nice try: NightGuard keeps its own clock.
 - 🔒 **No easy take-backs.** Once installed, you can make it stricter anytime, but loosening it or uninstalling needs a **7-day cool-off**. Like quitting anything else, the decision gets made with a clear head, not at 1 AM.
 - 📅 **Different bedtime per night.** Strict on school or work nights, chill on Friday.
 - 🎮 **Daily game and screen time budgets** (optional). "1 hour of games on weekdays" actually means 1 hour. Then the games close. Rude, but fair.
@@ -45,7 +45,7 @@ Needs 64-bit Windows 10 or 11. Nothing else to install: the installer brings eve
 - **30 and 5 minutes before bedtime:** a popup (with a sound) jumps in front of whatever you're doing and tells you to wrap up and save. The last one reminds you why you started.
 - **At bedtime:** a full-screen 60-second countdown (even over your game; shrink it to save first), then the PC hibernates. Your open stuff is saved to disk, usually.
 - **Switch it back on before unlock time?** About a minute later: countdown, hibernate. Repeat until you give up and sleep. 😴
-- **After unlock time:** your PC is back to normal, and your apps are where you left them.
+- **After unlock time:** your PC is back to normal, and your apps are where you left them. Waking it from last night's hibernate won't set off a leftover countdown: anything NightGuard started before the PC went to sleep is cancelled on wake-up, and it double-checks the clock before it ever acts.
 - **Your first sign-in of the day:** a morning check-in pops up to congratulate you (or gently roast you), shows your streak, and lets you log your mood. Or just click **Skip**.
 
 ### 🧪 Not sure yet? Test drive it first
@@ -168,7 +168,9 @@ NightGuard treats itself like a commitment, because "I'll just turn it off tonig
 - **Closing the app does nothing.** The guarding is done by a Windows service. If the tray app is closed or killed, the service starts it again; if the service is stopped, a watchdog starts it again within 5 minutes, and Windows restarts it if it crashes.
 - **Moving the clock forward** while NightGuard runs doesn't shorten the cool-off: the request moves forward by the same amount. Changing the time zone doesn't move bedtime (see [time zones](#-settings)).
 
-Honest note: this is a speed bump for your 1 AM brain, not a prison. A Windows administrator can still [remove NightGuard by hand](#-removing-it-by-hand-last-resort). If you want it airtight, use a standard (non-admin) Windows account day to day and let someone you trust keep the admin password. Standard accounts can't stop the service, change the clock, or touch NightGuard's files.
+Honest note: this is a speed bump for your 1 AM brain, not a prison. A Windows administrator can still [remove NightGuard by hand](#-removing-it-by-hand-last-resort). If you want it airtight, use a standard (non-admin) Windows account day to day and let someone you trust keep the admin password.
+
+What a **standard account** can't do to dodge it: stop the service, change NightGuard's files or settings, change the clock, outrun it with the time zone (NightGuard pins the time zone of your last save), cancel the bedtime shutdown, or close the countdown to skip it. What still gets past it: Safe Mode (on purpose, so you're never truly locked out), changing the clock in the BIOS, and for app blocking, copying the app somewhere else.
 
 ## 🔐 Trusted-person mode
 
@@ -225,6 +227,7 @@ NightGuard was built to be strict at night and harmless otherwise:
 - There's always a countdown of at least 15 seconds before anything happens.
 - **Damaged settings or a wrong clock?** NightGuard does nothing rather than risk a shutdown loop. If the settings file can't be read, or the clock is earlier than when the settings were saved (for example after a BIOS reset), it stands down and writes why in the log.
 - **Safe Mode is always safe:** the service doesn't run in Safe Mode, and would do nothing there if it did.
+- **Resume-safe.** Every countdown is timed by the real clock. If the PC goes to sleep or hibernates in the middle of one, that countdown is dropped when it wakes up, and a fresh check decides what (if anything) happens. So hibernating at midnight and switching on at 10 AM gives you a normal morning, not a surprise hibernate.
 - If blocking hits an error, it removes the blocks rather than leaving things half-blocked.
 
 ### 🔧 Removing it by hand (last resort)
@@ -247,7 +250,7 @@ Get-Process NightGuard -ErrorAction SilentlyContinue | Stop-Process -Force
 Get-NetFirewallRule -Group 'NightGuard' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
 $h = "$env:SystemRoot\System32\drivers\etc\hosts"
 (Get-Content $h -Raw) -replace '(?ms)^# >>> NightGuard BEGIN.*?^# <<< NightGuard END[^\n]*\n?', '' | Set-Content $h -NoNewline
-Remove-Item "$env:ProgramData\NightGuard", "$env:ProgramFiles\NightGuard" -Recurse -Force
+cmd /c rmdir /s /q "$env:ProgramData\NightGuard" "$env:ProgramFiles\NightGuard"
 Remove-Item "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\NightGuard*.lnk", "$env:PUBLIC\Desktop\NightGuard.lnk" -ErrorAction SilentlyContinue
 ```
 
@@ -304,6 +307,9 @@ That's exactly the kind of thing NightGuard is here to stop. During the day you 
 
 **Does it spy on me or phone home?**
 No. No internet, no accounts, no tracking. Your mood journal never leaves the PC. The source is all here to read.
+
+**I'm travelling. Does it follow my time zone?**
+NightGuard keeps the time zone you last saved your settings in (otherwise changing the time zone would be a one-click escape, and anyone can do that without admin rights). Moving for real? Change the Windows time zone, then save your settings again. Heading east is stricter (bedtime comes sooner) and saves right away; heading west counts as looser, so it needs the cool-off or your trusted person's code.
 
 **I work night shifts.**
 Set your own bedtime and unlock time per night. Any time works, as long as there are at least 6 free hours between nights.

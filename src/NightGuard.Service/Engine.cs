@@ -33,6 +33,9 @@ internal sealed partial class Engine
     private DateTime _cfgFileTime;
     private UsageState? _usage;
 
+    /// <summary>A countdown this far past its end was interrupted (sleep, hibernate) and must not act.</summary>
+    private static readonly TimeSpan StaleAfter = TimeSpan.FromSeconds(30);
+
     private sealed record Pending(DateTime DueUtc, string Action, string Reason);
     private Pending? _bedtimePending;
     private DateTime? _lastBedtimeActionUtc;
@@ -177,11 +180,13 @@ internal sealed partial class Engine
         if (_screenLockDueUtc is { } lockDue && utc >= lockDue)
         {
             _screenLockDueUtc = null;
+            if (utc - lockDue > StaleAfter) return;   // the PC slept in between: stale
             foreach (var id in InUseSessions(Native.UserSessions())) Native.WTSDisconnectSession(Native.WtsCurrentServer, id, false);
         }
         if (_screenShutdown is { } sd && utc >= sd.DueUtc)
         {
             _screenShutdown = null;
+            if (utc - sd.DueUtc > StaleAfter) { _store.Log("screen time shutdown was interrupted by sleep; dropped"); return; }
             if (cfg.ScreenTime.Enabled && InUseSessions(Native.UserSessions()).Count > 0) Power.Run("Shutdown", _store, sd.Reason);
         }
     }
@@ -219,6 +224,15 @@ internal sealed partial class Engine
         if (_bedtimePending is { } p)
         {
             if (utc < p.DueUtc) return;
+            // Long overdue means the PC slept or hibernated mid-countdown: never act without a fresh
+            // warning. Drop it; the next tick starts a new countdown if it's still bedtime.
+            if (utc - p.DueUtc > StaleAfter)
+            {
+                _store.Log("bedtime countdown was interrupted by sleep; starting a fresh one");
+                _bedtimePending = null;
+                _lastBedtimeActionUtc = null;
+                return;
+            }
             _bedtimePending = null;
             _lastBedtimeActionUtc = utc;
             switch (p.Action)

@@ -41,11 +41,51 @@ internal sealed class Store
     private static readonly SecurityIdentifier Admins = new(WellKnownSidType.BuiltinAdministratorsSid, null);
     private static readonly SecurityIdentifier Users = new(WellKnownSidType.BuiltinUsersSid, null);
 
-    /// <summary>Creates the folder: SYSTEM and Administrators full control, Users may read.</summary>
+    private static readonly SecurityIdentifier TrustedInstaller = new("S-1-5-80-956008885-3418522649-1831038044-1850803645-3051927394");
+
+    /// <summary>
+    /// A folder NightGuard made is owned by SYSTEM or Administrators and nobody else can write to it.
+    /// Anything else was made by someone else (for example a standard user creating it before
+    /// NightGuard was installed, to plant settings or a trusted-person code they know).
+    /// </summary>
+    private bool IsTrustedFolder(DirectoryInfo di)
+    {
+        try
+        {
+            var sec = di.GetAccessControl();
+            var owner = sec.GetOwner(typeof(SecurityIdentifier)) as SecurityIdentifier;
+            if (owner is null || !(owner == System || owner == Admins || owner == TrustedInstaller)) return false;
+            const FileSystemRights write = FileSystemRights.WriteData | FileSystemRights.AppendData | FileSystemRights.WriteAttributes
+                | FileSystemRights.WriteExtendedAttributes | FileSystemRights.Delete | FileSystemRights.DeleteSubdirectoriesAndFiles
+                | FileSystemRights.ChangePermissions | FileSystemRights.TakeOwnership;
+            foreach (FileSystemAccessRule r in sec.GetAccessRules(true, true, typeof(SecurityIdentifier)))
+            {
+                if (r.AccessControlType != AccessControlType.Allow || (r.FileSystemRights & write) == 0) continue;
+                var who = (SecurityIdentifier)r.IdentityReference;
+                if (who != System && who != Admins && who != TrustedInstaller) return false;
+            }
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Creates the folder: owned by Administrators, SYSTEM and Administrators full control, Users may read.
+    /// A folder someone else made is moved aside first (never trusted, never followed into).
+    /// </summary>
     public void EnsureFolder()
     {
+        var existing = new DirectoryInfo(Dir);
+        if (existing.Exists && (existing.Attributes.HasFlag(FileAttributes.ReparsePoint) || !IsTrustedFolder(existing)))
+        {
+            var aside = Dir + ".untrusted-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+            try { existing.MoveTo(aside); }
+            catch { try { existing.Delete(true); } catch { } }   // .NET deletes links themselves, never their targets
+            Log($"the NightGuard data folder wasn't made by NightGuard (or an administrator); it was moved aside to {aside} and not trusted");
+        }
         var di = Directory.CreateDirectory(Dir);
         var sec = new DirectorySecurity();
+        sec.SetOwner(Admins);
         sec.SetAccessRuleProtection(true, false);
         const InheritanceFlags inherit = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
         sec.AddAccessRule(new FileSystemAccessRule(System, FileSystemRights.FullControl, inherit, PropagationFlags.None, AccessControlType.Allow));
