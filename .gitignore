@@ -1,11 +1,5 @@
-# Local test files
+# Local files
 *.log
-log.txt
-config.json
-trusted.json
-state.json
-hosts.backup
-firewall.sig
 *.zip
 
 # Editors and OS
