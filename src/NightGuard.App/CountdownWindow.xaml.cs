@@ -13,9 +13,10 @@ namespace NightGuard.App;
 /// The bedtime countdown, built to get through to someone mid-game:
 ///  - It takes over the whole screen the game is on. If a game in exclusive fullscreen keeps it
 ///    hidden, the game is minimised (it's about to be shut down anyway).
-///  - "Let me save first" shrinks it to a small always-on-top pill so you can save.
+///  - "Let me save first" swaps it for a small always-on-top bar (its own window) so you can save.
 ///  - With 10 seconds left it takes over the screen again. It can't be dismissed: closing it just
-///    turns it back into the pill.
+///    turns it back into the bar.
+///  - "Shut down now" (or hibernate, sleep...) skips the wait: two clicks, so it's never an accident.
 /// It's only a heads-up: the service does the bedtime action when time is up, whatever happens here.
 /// </summary>
 public partial class CountdownWindow : Window
@@ -32,15 +33,29 @@ public partial class CountdownWindow : Window
     private System.Drawing.Rectangle _screen;
     private readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _front = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private readonly Func<Task<bool>>? _actNow;
+    private CountdownBar? _bar;
+    private DateTime _armedUntil = DateTime.MinValue;
 
-    public CountdownWindow(int seconds, string actionWord, string why, bool preview)
+    /// <summary>The button text for doing the bedtime action right away.</summary>
+    public static string ActNowLabel(string actionWord) => actionWord switch
     {
+        "shut down" => "\U0001F480  Shut down now",
+        "hibernate" => "\U0001F634  Hibernate now",
+        "go to sleep" => "\U0001F4A4  Sleep now",
+        "lock" => "\U0001F512  Lock now",
+        "sign you out" => "\U0001F44B  Sign out now",
+        _ => "\u23E9  Do it now",
+    };
+
+    public CountdownWindow(int seconds, string actionWord, string why, bool preview, Func<Task<bool>>? actNow = null)
+    {
+        _actNow = actNow;
         InitializeComponent();
         _left = seconds;
         _preview = preview;
         _actionWord = actionWord;
         Root.Background = Art.NightSky();
-        PillPanel.Background = Art.NightSky();
         Art.Stars(Sky, 3840, 2160, 160, 11);
         MoonHolder.Children.Add(new System.Windows.Shapes.Ellipse
         {
@@ -57,21 +72,23 @@ public partial class CountdownWindow : Window
         Prefix.Text = preview ? "PREVIEW (nothing will happen, press Esc to close) \U0001F440" : "It's bedtime. Goodnight! \U0001F634";
         WhyText.Text = string.IsNullOrWhiteSpace(why) ? "" : $"\U0001F4AC You said: “{why}”";
         WhyText.Visibility = string.IsNullOrWhiteSpace(why) ? Visibility.Collapsed : Visibility.Visible;
+        ActNowButton.Content = ActNowLabel(actionWord);
         UpdateText();
 
         _tick.Tick += (_, _) => Tick();
-        _front.Tick += (_, _) => StayOnTop.Front(this, activate: !_pill);
+        _front.Tick += (_, _) => { if (!_pill) StayOnTop.Front(this, activate: true); };
         SourceInitialized += (_, _) => Setup();
         ContentRendered += (_, _) => Begin();
         Closing += OnClosing;
         KeyDown += (_, e) => { if (_preview && e.Key == System.Windows.Input.Key.Escape) ForceClose(); };
-        Closed += (_, _) => { _tick.Stop(); _front.Stop(); };
+        Closed += (_, _) => { _tick.Stop(); _front.Stop(); _bar?.CloseForGood(); };
     }
 
     /// <summary>Closes it for real (a newer countdown replaces it, or the app is exiting).</summary>
     public void ForceClose()
     {
         _done = true;
+        _bar?.CloseForGood();
         Close();
     }
 
@@ -119,6 +136,7 @@ public partial class CountdownWindow : Window
             return;
         }
         UpdateText();
+        if (DateTime.UtcNow > _armedUntil && ActNowButton.IsEnabled) ActNowButton.Content = ActNowLabel(_actionWord);
         if (_pill && _left == FinalSeconds)
         {
             // Last call: take over the screen again
@@ -131,9 +149,8 @@ public partial class CountdownWindow : Window
     private void UpdateText()
     {
         Seconds.Text = _left.ToString();
-        PillSeconds.Text = _left.ToString();
         Line.Text = $"This PC will {_actionWord} in {_left} second{(_left == 1 ? "" : "s")}.";
-        PillText.Text = $"seconds until the PC will {_actionWord}. Save now! \U0001F4BE";
+        _bar?.Update(_left, _actionWord);
         var canShrink = _left > FinalSeconds;
         SaveFirstButton.Visibility = canShrink ? Visibility.Visible : Visibility.Collapsed;
         SmallPrint.Text = canShrink
@@ -144,33 +161,66 @@ public partial class CountdownWindow : Window
     private void ShowFull()
     {
         _pill = false;
-        FullPanel.Visibility = Visibility.Visible;
-        PillPanel.Visibility = Visibility.Collapsed;
+        _bar?.Hide();
+        if (!IsVisible) Show();
         SetWindowPos(_hwnd, new IntPtr(-1), _screen.X, _screen.Y, _screen.Width, _screen.Height, 0x0040 /* SWP_SHOWWINDOW */);
     }
 
-    private void ShowPill()
+    /// <summary>Swaps the full screen for the little bar, so you can save.</summary>
+    private void ShowBar()
     {
+        if (_left <= FinalSeconds) return;
         _pill = true;
-        FullPanel.Visibility = Visibility.Collapsed;
-        PillPanel.Visibility = Visibility.Visible;
-        var dpi = VisualTreeHelper.GetDpi(this).DpiScaleX;
-        var w = (int)(560 * dpi);
-        var h = (int)(76 * dpi);
-        SetWindowPos(_hwnd, new IntPtr(-1), _screen.X + (_screen.Width - w) / 2, _screen.Y + (int)(12 * dpi), w, h,
-                     0x0040 | 0x0010 /* SWP_SHOWWINDOW | SWP_NOACTIVATE */);
+        _bar ??= new CountdownBar(ActNowLabel(_actionWord), ShowFull, ActNowFromBarAsync);
+        var dpi = VisualTreeHelper.GetDpi(this);
+        _bar.ShowAt((_screen.X + _screen.Width / 2.0) / dpi.DpiScaleX, _screen.Y / dpi.DpiScaleY + 12);
+        _bar.Update(_left, _actionWord);
+        Hide();
     }
 
-    private void SaveFirst_Click(object sender, RoutedEventArgs e) => ShowPill();
+    private void SaveFirst_Click(object sender, RoutedEventArgs e) => ShowBar();
 
-    private void Expand_Click(object sender, RoutedEventArgs e) => ShowFull();
+    // ---- Do it now: first click arms the button, a second click within 4 seconds confirms ----
+    private async void ActNow_Click(object sender, RoutedEventArgs e)
+    {
+        if (DateTime.UtcNow > _armedUntil)
+        {
+            _armedUntil = DateTime.UtcNow.AddSeconds(4);
+            ActNowButton.Content = "Sure? Click again \U0001F449";
+            return;
+        }
+        await ActNowAsync();
+    }
+
+    private async Task<bool> ActNowFromBarAsync() => await ActNowAsync();
+
+    private async Task<bool> ActNowAsync()
+    {
+        _armedUntil = DateTime.MinValue;
+        if (_preview)
+        {
+            Line.Text = "In a real countdown, this would happen right now. \U0001F44D";
+            ActNowButton.Content = ActNowLabel(_actionWord);
+            if (_pill) ShowFull();
+            return true;
+        }
+        ActNowButton.IsEnabled = false;
+        ActNowButton.Content = "Goodnight! \U0001F319";
+        var ok = _actNow is not null && await _actNow();
+        if (!ok)
+        {
+            ActNowButton.IsEnabled = true;
+            ActNowButton.Content = ActNowLabel(_actionWord);
+        }
+        return ok;
+    }
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {
         if (_done || _preview) return;
         // Can't be dismissed, only shrunk (and only until the last 10 seconds)
         e.Cancel = true;
-        if (_left > FinalSeconds) ShowPill();
+        ShowBar();
     }
 
     // ---- Win32 ----

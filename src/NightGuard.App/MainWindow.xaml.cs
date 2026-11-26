@@ -1,3 +1,4 @@
+using System.IO;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -47,11 +48,13 @@ public partial class MainWindow : Window
     private string? _savedEndDate;
 
     private static readonly string[] ActionOrder = ["Hibernate", "Shutdown", "Sleep", "SignOut", "Lock"];
+    private readonly Dictionary<string, TextBlock> _actionLocks = [];
+    private string? _savedAction;   // the bedtime action NightGuard is running with (null before setup)
 
     private static readonly Dictionary<string, (string Emoji, string Name, int Strength, string Text)> ActionInfo = new()
     {
         ["Hibernate"] = ("🌙", "Hibernate", 3, "Saves your open apps and powers off. They're usually still there in the morning (save anyway). If hibernate is off in Windows, NightGuard offers to turn it on."),
-        ["Shutdown"] = ("🔌", "Shut down", 3, "Closes everything. Unsaved work is lost."),
+        ["Shutdown"] = ("💀", "Shut down", 4, "The nuclear option. Everything closes, unsaved work is gone, and the PC goes properly dark. For the brave. 🦁"),
         ["Sleep"] = ("💤", "Sleep", 2, "Quick to resume, so it goes back to sleep every few minutes all night."),
         ["SignOut"] = ("🚪", "Sign out", 2, "Closes your apps and signs you out, again if you sign back in."),
         ["Lock"] = ("🔒", "Lock", 1, "Locks the screen every few minutes. You can keep signing back in."),
@@ -95,6 +98,7 @@ public partial class MainWindow : Window
         BuildNightCards();
         BuildWarningCards();
         BuildActionCards();
+        SetupListEditors();
         BuildSlotCards();
         CountdownPills.SetChoices([(30, "30 s"), (60, "1 min"), (120, "2 min"), (300, "5 min")], Seconds);
         RecheckPills.SetChoices([(1, "1 min"), (2, "2 min"), (5, "5 min"), (10, "10 min"), (15, "15 min")], m => $"{m} min");
@@ -376,6 +380,14 @@ public partial class MainWindow : Window
             nameText.VerticalAlignment = VerticalAlignment.Center;
             head.Children.Add(nameText);
             sp.Children.Add(head);
+            if (a == "Shutdown")
+            {
+                sp.Children.Add(new Border
+                {
+                    CornerRadius = new CornerRadius(8), Background = Art.Alarm(), Padding = new Thickness(8, 2, 8, 2), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 8),
+                    Child = new TextBlock { Text = "BRAVEST 🦁 STRONGEST", FontSize = 10.5, FontWeight = FontWeights.Bold, Foreground = Brushes.White },
+                });
+            }
             if (a == "Hibernate")
             {
                 sp.Children.Add(new Border
@@ -386,10 +398,18 @@ public partial class MainWindow : Window
             }
             var dots = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
             dots.Children.Add(new TextBlock { Text = "Strength ", FontSize = 12, Foreground = Res("NgMuted"), VerticalAlignment = VerticalAlignment.Center });
-            for (var i = 0; i < 3; i++)
-                dots.Children.Add(new System.Windows.Shapes.Ellipse { Width = 10, Height = 10, Margin = new Thickness(3, 0, 0, 0), Fill = i < strength ? Res("NgMoon") : Res("NgSurface2") });
+            for (var i = 0; i < 4; i++)
+                dots.Children.Add(new System.Windows.Shapes.Ellipse { Width = 10, Height = 10, Margin = new Thickness(3, 0, 0, 0),
+                    Fill = i >= strength ? Res("NgSurface2") : a == "Shutdown" ? Res("NgRed") : Res("NgMoon") });
             sp.Children.Add(dots);
             sp.Children.Add(Text(text, "Hint"));
+            var lockNote = new TextBlock
+            {
+                Text = "🔒 Weaker than what you have now: needs the 7-day cool-off (or the trusted person's code).",
+                TextWrapping = TextWrapping.Wrap, FontSize = 12, Foreground = Res("NgOrange"), Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed,
+            };
+            sp.Children.Add(lockNote);
+            _actionLocks[a] = lockNote;
             var card = new ToggleButton { Content = sp, Tag = a, Width = 236 };
             card.SetResourceReference(StyleProperty, "ChoiceCard");
             card.Click += (_, _) => SelectAction(a);
@@ -399,6 +419,23 @@ public partial class MainWindow : Window
     }
 
     private string _action = "Hibernate";
+
+    /// <summary>
+    /// Once NightGuard runs, the bedtime action can move to the same or a stronger one any time.
+    /// Weaker ones are locked until an unlock (cool-off) is open, or the trusted person's code is used.
+    /// </summary>
+    private void UpdateActionLocks()
+    {
+        var current = _savedAction is null ? 0 : NightGuard.Core.SelfLock.SelfLockRules.ActionStrength(_savedAction);
+        var canLoosen = !Configured || TrustedOn || _status?.UnlockState == "Open";
+        foreach (var (a, card) in _actionCards)
+        {
+            var locked = !canLoosen && NightGuard.Core.SelfLock.SelfLockRules.ActionStrength(a) < current;
+            card.IsEnabled = !locked;
+            card.ToolTip = locked ? "Weaker than your current bedtime action. Request an unlock to choose it." : null;
+            _actionLocks[a].Visibility = locked ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
 
     private void SelectAction(string a)
     {
@@ -488,6 +525,8 @@ public partial class MainWindow : Window
             if (c.Ok && c.Config is not null) cfg = c.Config;
         }
         LoadForm(cfg);
+        _savedAction = Configured ? cfg.Action : null;
+        UpdateActionLocks();
         TrustCheck.IsChecked = _status?.TrustedEnabled == true;
         ContactBox.Text = _status?.TrustedContact ?? "";
         _loading = false;
@@ -776,9 +815,8 @@ public partial class MainWindow : Window
         var b = cfg.Blocking;
         BlockCheck.IsChecked = b.Enabled;
         BlockBedtimeCheck.IsChecked = b.DuringBedtime;
-        SitesBox.Text = string.Join(Environment.NewLine, b.Sites);
-        AppsList.Items.Clear();
-        foreach (var a in b.Apps) AppsList.Items.Add(a);
+        SitesEditor.SetItems(b.Sites);
+        AppsEditor.SetItems(b.Apps);
         for (var i = 0; i < 4; i++)
         {
             var row = _slots[i];
@@ -794,20 +832,24 @@ public partial class MainWindow : Window
         }
 
         var st = cfg.ScreenTime;
-        ScreenCheck.IsChecked = st.Enabled;
-        GameWd.Value = st.GameMinutesWeekday;
-        GameWe.Value = st.GameMinutesWeekend;
-        ScreenWd.Value = st.ScreenMinutesWeekday;
-        ScreenWe.Value = st.ScreenMinutesWeekend;
+        // Each budget has its own switch. Off is stored as 0 minutes; the boxes then show the usual defaults.
+        var gameOn = st.Enabled && (st.GameMinutesWeekday > 0 || st.GameMinutesWeekend > 0);
+        var screenOn = st.Enabled && (st.ScreenMinutesWeekday > 0 || st.ScreenMinutesWeekend > 0);
+        GameLimitCheck.IsChecked = gameOn;
+        ScreenLimitCheck.IsChecked = screenOn;
+        GameWd.Value = gameOn ? st.GameMinutesWeekday : 60;
+        GameWe.Value = gameOn ? st.GameMinutesWeekend : 120;
+        ScreenWd.Value = screenOn ? st.ScreenMinutesWeekday : 240;
+        ScreenWe.Value = screenOn ? st.ScreenMinutesWeekend : 360;
         ResetHour.Value = st.ResetHour;
         GraceBox.Value = st.ShutdownGraceMinutes;
         LimitPills.Value = Math.Max(0, Array.IndexOf(Defaults.ScreenActions, st.LimitAction));
         WarnAtPills.Values = st.WarnAtMinutesLeft.Where(m => m > 0).ToList();
         LaunchersCheck.IsChecked = st.CloseLaunchers;
-        GameFolders.Text = string.Join(Environment.NewLine, st.GameFolders);
-        GameProcs.Text = string.Join(Environment.NewLine, st.GameProcesses);
-        IgnoreProcs.Text = string.Join(Environment.NewLine, st.IgnoreProcesses);
-        LauncherProcs.Text = string.Join(Environment.NewLine, st.LauncherProcesses);
+        GameFoldersEditor.SetItems(st.GameFolders);
+        GameProcsEditor.SetItems(st.GameProcesses);
+        IgnoreProcsEditor.SetItems(st.IgnoreProcesses);
+        LauncherProcsEditor.SetItems(st.LauncherProcesses);
         UsageText.Text = _status is { Configured: true, ScreenTimeEnabled: true } ? _status.UsageText : "";
         UsageText.Visibility = UsageText.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         _loading = false;
@@ -848,8 +890,8 @@ public partial class MainWindow : Window
         {
             Enabled = BlockCheck.IsChecked == true,
             DuringBedtime = BlockBedtimeCheck.IsChecked == true,
-            Sites = Lines(SitesBox.Text).Select(s => s.ToLowerInvariant()).ToList(),
-            Apps = AppsList.Items.Cast<string>().ToList(),
+            Sites = SitesEditor.Items.Select(s => s.ToLowerInvariant()).ToList(),
+            Apps = AppsEditor.Items.ToList(),
             Windows = _slots.Where(s => s.On.IsChecked == true).Select(s => new BlockWindow
             {
                 Days = Enumerable.Range(0, 7).Where(d => s.Days[d].IsChecked == true).Select(d => Defaults.Days[d]).ToList(),
@@ -858,18 +900,20 @@ public partial class MainWindow : Window
         };
         cfg.ScreenTime = new ScreenTimeSettings
         {
-            Enabled = ScreenCheck.IsChecked == true,
+            Enabled = GameLimitCheck.IsChecked == true || ScreenLimitCheck.IsChecked == true,
             ResetHour = ResetHour.Value,
-            GameMinutesWeekday = GameWd.Value, GameMinutesWeekend = GameWe.Value,
-            ScreenMinutesWeekday = ScreenWd.Value, ScreenMinutesWeekend = ScreenWe.Value,
+            GameMinutesWeekday = GameLimitCheck.IsChecked == true ? GameWd.Value : 0,
+            GameMinutesWeekend = GameLimitCheck.IsChecked == true ? GameWe.Value : 0,
+            ScreenMinutesWeekday = ScreenLimitCheck.IsChecked == true ? ScreenWd.Value : 0,
+            ScreenMinutesWeekend = ScreenLimitCheck.IsChecked == true ? ScreenWe.Value : 0,
             WarnAtMinutesLeft = WarnAtPills.Values,
             LimitAction = Defaults.ScreenActions[Math.Clamp(LimitPills.Value, 0, Defaults.ScreenActions.Length - 1)],
             ShutdownGraceMinutes = GraceBox.Value,
             CloseLaunchers = LaunchersCheck.IsChecked == true,
-            GameFolders = Lines(GameFolders.Text),
-            GameProcesses = Lines(GameProcs.Text),
-            IgnoreProcesses = Lines(IgnoreProcs.Text),
-            LauncherProcesses = Lines(LauncherProcs.Text),
+            GameFolders = GameFoldersEditor.Items.ToList(),
+            GameProcesses = GameProcsEditor.Items.ToList(),
+            IgnoreProcesses = IgnoreProcsEditor.Items.ToList(),
+            LauncherProcesses = LauncherProcsEditor.Items.ToList(),
         };
         return ConfigSerializer.Normalize(cfg);
     }
@@ -912,7 +956,9 @@ public partial class MainWindow : Window
             if (hours is null or > 16) r.Note.Foreground = Res("NgRed"); else r.Note.ClearValue(TextBlock.ForegroundProperty);
         }
         foreach (var w in _warns) w.Body.IsEnabled = w.On.IsChecked == true;
-        ScreenBody.IsEnabled = ScreenCheck.IsChecked == true;
+        GameBody.IsEnabled = GameLimitCheck.IsChecked == true;
+        ScreenLimitBody.IsEnabled = ScreenLimitCheck.IsChecked == true;
+        SharedScreenCard.IsEnabled = GameLimitCheck.IsChecked == true || ScreenLimitCheck.IsChecked == true;
         GracePanel.Visibility = LimitPills.Value == 1 ? Visibility.Visible : Visibility.Collapsed;
         BlockBody.IsEnabled = BlockCheck.IsChecked == true;
         BlockBedtimeCheck.IsEnabled = BlockCheck.IsChecked == true;
@@ -990,39 +1036,59 @@ public partial class MainWindow : Window
         return true;
     }
 
-    private void AddGameFolder_Click(object sender, RoutedEventArgs e)
+    private void SocialPreset_Click(object sender, RoutedEventArgs e) => SitesEditor.AddRange(Defaults.SocialPreset);
+
+    private static string? ProtectedProblem(string path, string what) =>
+        PathRules.ForThisPc().IsProtected(path) ? $"That {what} is part of Windows, so it can't be used here." : null;
+
+    private string? PickProgram()
     {
-        var dlg = new Microsoft.Win32.OpenFolderDialog { Title = "Pick a folder where games are installed" };
-        if (dlg.ShowDialog(this) != true || IsProtected(dlg.FolderName, "folder")) return;
-        GameFolders.Text = string.Join(Environment.NewLine, Lines(GameFolders.Text).Append(dlg.FolderName));
+        var dlg = new Microsoft.Win32.OpenFileDialog { Title = "Pick a program to block", Filter = "Programs (*.exe)|*.exe" };
+        return dlg.ShowDialog(this) == true ? dlg.FileName : null;
     }
 
-    private void SocialPreset_Click(object sender, RoutedEventArgs e)
+    private string? PickFolder(string title)
     {
-        var have = Lines(SitesBox.Text).Select(s => s.ToLowerInvariant()).ToList();
-        SitesBox.Text = string.Join(Environment.NewLine, have.Concat(Defaults.SocialPreset.Where(s => !have.Contains(s))));
+        var dlg = new Microsoft.Win32.OpenFolderDialog { Title = title };
+        return dlg.ShowDialog(this) == true ? dlg.FolderName : null;
     }
 
-    private void AddApp_Click(object sender, RoutedEventArgs e)
+    /// <summary>Sets up the list editors: what each accepts, and their browse buttons.</summary>
+    private void SetupListEditors()
     {
-        var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Programs (*.exe)|*.exe" };
-        if (dlg.ShowDialog(this) != true || IsProtected(dlg.FileName, "program")) return;
-        if (!AppsList.Items.Contains(dlg.FileName)) AppsList.Items.Add(dlg.FileName);
-        OnFormChanged();
-    }
+        SitesEditor.Normalize = raw =>
+        {
+            // Accept pasted links: https://www.reddit.com/r/... becomes reddit.com
+            var d = raw.Trim().ToLowerInvariant();
+            if (d.Contains("://", StringComparison.Ordinal)) d = d[(d.IndexOf("://", StringComparison.Ordinal) + 3)..];
+            d = d.Split('/', '?', '#')[0];
+            return d.StartsWith("www.", StringComparison.Ordinal) ? d[4..] : d;
+        };
+        SitesEditor.Validate = d =>
+            !DomainRules.IsValid(d) ? "That isn't a site name. Try something like reddit.com."
+            : DomainRules.IsProtected(d) ? "Windows needs that site, so it can't be blocked."
+            : null;
 
-    private void AddAppFolder_Click(object sender, RoutedEventArgs e)
-    {
-        var dlg = new Microsoft.Win32.OpenFolderDialog { Title = "Every program inside this folder will be blocked (for example a Steam or Discord folder)" };
-        if (dlg.ShowDialog(this) != true || IsProtected(dlg.FolderName, "folder")) return;
-        if (!AppsList.Items.Contains(dlg.FolderName)) AppsList.Items.Add(dlg.FolderName);
-        OnFormChanged();
-    }
+        AppsEditor.Validate = p => ProtectedProblem(p, File.Exists(p) ? "program" : "folder");
+        AppsEditor.AddBrowseButton("\U0001F4E6  Add a program...", PickProgram);
+        AppsEditor.AddBrowseButton("\U0001F4C1  Add a whole folder...", () => PickFolder("Every program in this folder gets blocked (for example a Steam or Discord folder)"));
 
-    private void RemoveApp_Click(object sender, RoutedEventArgs e)
-    {
-        if (AppsList.SelectedIndex >= 0) AppsList.Items.RemoveAt(AppsList.SelectedIndex);
-        OnFormChanged();
+        GameFoldersEditor.Validate = p => !PathRules.IsFullPath(p) ? "Use a full folder path, like D:\\Games." : ProtectedProblem(p, "folder");
+        GameFoldersEditor.AddBrowseButton("\U0001F4C1  Browse for a game folder...", () => PickFolder("Pick a folder where games are installed"));
+
+        static string? ProgramName(string raw)
+        {
+            var n = raw.Trim().Trim('"');
+            if (n.Contains('\\', StringComparison.Ordinal)) n = Path.GetFileName(n);
+            return ConfigSerializer.StripExe(n);
+        }
+        foreach (var editor in new[] { GameProcsEditor, IgnoreProcsEditor, LauncherProcsEditor })
+        {
+            editor.Normalize = ProgramName;
+            editor.Validate = n => System.Text.RegularExpressions.Regex.IsMatch(n, @"^[\w .+()\-]{1,100}$") ? null : "That isn't a program name (as in Task Manager, without .exe).";
+        }
+        foreach (var editor in new[] { SitesEditor, AppsEditor, GameFoldersEditor, GameProcsEditor, IgnoreProcsEditor, LauncherProcsEditor })
+            editor.Changed += (_, _) => OnFormChanged();
     }
 
     // ================================================================ trusted person page

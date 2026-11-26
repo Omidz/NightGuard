@@ -104,11 +104,13 @@ Each warning card comes with a message that already says what's happening and wh
 
 | Action | Strength | The vibe |
 |---|---|---|
-| Hibernate (default, recommended) | 💪💪 | Saves your open stuff to disk, then powers off. Switch on after unlock time and it's all still there. |
-| Shutdown | 💪💪💪 | Closes everything. Unsaved work is gone. Very effective. |
-| Sleep | 💪 | Quick to resume, but it'll keep putting itself back to sleep. |
-| Sign out | 💪 | Closes your apps and signs you out, again and again. |
-| Lock | 🪶 | Just locks the screen. Fine if you only need a nudge. |
+| 💀 Shutdown (bravest) | 💪💪💪💪 | The nuclear option. Everything closes, unsaved work is gone, the PC goes properly dark. For the brave. 🦁 |
+| 🌙 Hibernate (default, recommended) | 💪💪💪 | Saves your open stuff to disk, then powers off. Switch on after unlock time and it's all still there. |
+| 💤 Sleep | 💪💪 | Quick to resume, but it'll keep putting itself back to sleep. |
+| 🚪 Sign out | 💪💪 | Closes your apps and signs you out, again and again. |
+| 🔒 Lock | 🪶 | Just locks the screen. Fine if you only need a nudge. |
+
+Once NightGuard is running you can always switch to an action of the **same or more strength** (Sleep to Shutdown, say). A weaker one (Shutdown to Sleep) shows a 🔒 and needs the [7-day cool-off](#-no-easy-take-backs-the-self-lock) or your trusted person's code.
 
 **About Hibernate.** The PC really powers off, but your open apps come back when you switch it on again (and if you switch it on during locked hours, it hibernates again after the countdown). Keep in mind:
 
@@ -153,7 +155,7 @@ Privacy: the journal stays on this PC, in a folder that only your Windows accoun
 
 ## 🎮 Screen time limits
 
-Turn them on in the Game and screen time step.
+Turn them on in the Game and screen time step. **Game time** and **screen time** each have their own switch, so use one, both, or neither.
 
 - **Game time** counts while a game is running and you're at the screen. It warns you at 15, 5 and 1 minutes left. When it's used up, games (and optionally launchers like Steam) are closed, and closed again if you reopen them.
 - **Screen time** counts every minute you're signed in and the screen isn't locked. When it runs out, NightGuard locks the PC (default), shuts it down, or just nags you, your choice.
@@ -325,7 +327,7 @@ Set your own bedtime and unlock time per night. Any time works, as long as there
 With Shutdown, yes, after the countdown. With Hibernate (the default) your game is usually still there when you switch the PC back on, but don't bet your save file on it. That's why there are warnings. Save at the 5-minute warning. 🙂
 
 **Will the warnings show up over my fullscreen game?**
-The bedtime countdown will. It takes over the whole screen your game is on, and if a game in *exclusive* fullscreen keeps it hidden, NightGuard minimises the game. Need to save? Click "Let me save first" and it shrinks to a small bar on top of the screen while you save; 10 seconds before the end it takes over the screen again (and closing it doesn't stop it). The earlier warnings are always-on-top popups that pull themselves to the front, with a sound and a Windows notification as backup. They get through *borderless* fullscreen (most games today); in *exclusive* fullscreen you'll at least hear them. Tip: switch your game to borderless or windowed fullscreen to see every warning.
+The bedtime countdown will. It takes over the whole screen your game is on, and if a game in *exclusive* fullscreen keeps it hidden, NightGuard minimises the game. Need to save? Click "Let me save first" and it shrinks to a small bar on top of the screen while you save; 10 seconds before the end it takes over the screen again (and closing it doesn't stop it). Done already and don't want to wait? Click "Shut down now" (or "Hibernate now", and so on) twice, and it happens straight away. The earlier warnings are always-on-top popups that pull themselves to the front, with a sound and a Windows notification as backup. They get through *borderless* fullscreen (most games today); in *exclusive* fullscreen you'll at least hear them. Tip: switch your game to borderless or windowed fullscreen to see every warning.
 
 **Can I delete the installer I downloaded?**
 Yes. NightGuard is installed in `C:\Program Files\NightGuard` and runs from there.

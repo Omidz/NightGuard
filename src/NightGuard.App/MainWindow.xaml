@@ -347,53 +347,71 @@
                 <ScrollViewer x:Name="PageScreen" Style="{StaticResource PageScroll}">
                     <StackPanel Style="{StaticResource PageBody}">
                         <local:PageHeader x:Name="HeadScreen" Emoji="🎮" EmojiColor="#C8F2C8" Title="Game and screen time" Subtitle="&quot;Just one more game&quot; now comes with a budget. Optional." />
+                        <TextBlock Style="{StaticResource Lead}" Text="Pick one, both or neither. Each has its own switch." />
+
+                        <!-- Game time -->
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
-                                <CheckBox x:Name="ScreenCheck" Style="{StaticResource ToggleSwitch}" Content="Daily game and screen time budgets" FontWeight="SemiBold" FontSize="16"
+                                <CheckBox x:Name="GameLimitCheck" Style="{StaticResource ToggleSwitch}" Content="🎮 Game time budget" FontWeight="SemiBold" FontSize="16"
                                           Checked="Section_Changed" Unchecked="Section_Changed" />
-                                <TextBlock x:Name="UsageText" Style="{StaticResource Hint}" Margin="58,6,0,0" />
+                                <TextBlock Style="{StaticResource Hint}" Margin="58,4,0,0" Text="Counts while a game runs. When it's used up, games close (and close again if you reopen them)." />
+                                <StackPanel x:Name="GameBody" Margin="0,16,0,0">
+                                    <WrapPanel>
+                                        <Border Style="{StaticResource TileCard}" Width="250"><StackPanel><TextBlock Text="Weekdays" Style="{StaticResource Label}" /><local:IntBox x:Name="GameWd" Min="0" Max="1440" Step="15" Suffix="min" /></StackPanel></Border>
+                                        <Border Style="{StaticResource TileCard}" Width="250"><StackPanel><TextBlock Text="Weekends" Style="{StaticResource Label}" /><local:IntBox x:Name="GameWe" Min="0" Max="1440" Step="15" Suffix="min" /></StackPanel></Border>
+                                    </WrapPanel>
+                                    <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,10" Text="0 means no game limit on those days." />
+                                    <CheckBox x:Name="LaunchersCheck" Style="{StaticResource ToggleSwitch}" Content="Also close game launchers (Steam, Epic...)" Margin="0,0,0,8" />
+                                    <Expander Header="Fine-tune what counts as a game" FontSize="14" Margin="0,8,0,0">
+                                        <StackPanel Margin="4,12,0,4">
+                                            <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,12" Text="Anything running from a game folder counts as a game. Program names are as in Task Manager > Details (no .exe needed). Windows' own programs are never closed." />
+                                            <TextBlock Text="📁 Game folders" Style="{StaticResource H2}" Margin="0,0,0,6" />
+                                            <local:ListEditor x:Name="GameFoldersEditor" IsPath="True" Placeholder="Paste a folder path, or browse" MaxListHeight="220" />
+                                            <UniformGrid Columns="3" Margin="0,18,0,0">
+                                                <StackPanel Margin="0,0,12,0"><TextBlock Text="🎮 Extra games" Style="{StaticResource H2}" Margin="0,0,0,6" /><local:ListEditor x:Name="GameProcsEditor" Emoji="🎮" Placeholder="e.g. cs2" MaxListHeight="200" /></StackPanel>
+                                                <StackPanel Margin="0,0,12,0"><TextBlock Text="🙈 Never count" Style="{StaticResource H2}" Margin="0,0,0,6" /><local:ListEditor x:Name="IgnoreProcsEditor" Emoji="🙈" Placeholder="e.g. Spotify" MaxListHeight="200" /></StackPanel>
+                                                <StackPanel><TextBlock Text="🚀 Launchers" Style="{StaticResource H2}" Margin="0,0,0,6" /><local:ListEditor x:Name="LauncherProcsEditor" Emoji="🚀" Placeholder="e.g. steam" MaxListHeight="200" /></StackPanel>
+                                            </UniformGrid>
+                                        </StackPanel>
+                                    </Expander>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
-                        <StackPanel x:Name="ScreenBody">
-                            <TextBlock Text="Minutes per day (0 means no limit)" Style="{StaticResource H2}" Margin="0,6,0,12" />
-                            <WrapPanel>
-                                <Border Style="{StaticResource TileCard}" Width="250"><StackPanel><TextBlock Text="🎮 Games, weekdays" Style="{StaticResource Label}" /><local:IntBox x:Name="GameWd" Min="0" Max="1440" Step="15" Suffix="min" /></StackPanel></Border>
-                                <Border Style="{StaticResource TileCard}" Width="250"><StackPanel><TextBlock Text="🎮 Games, weekends" Style="{StaticResource Label}" /><local:IntBox x:Name="GameWe" Min="0" Max="1440" Step="15" Suffix="min" /></StackPanel></Border>
-                                <Border Style="{StaticResource TileCard}" Width="250"><StackPanel><TextBlock Text="🖥️ Screen, weekdays" Style="{StaticResource Label}" /><local:IntBox x:Name="ScreenWd" Min="0" Max="1440" Step="15" Suffix="min" /></StackPanel></Border>
-                                <Border Style="{StaticResource TileCard}" Width="250"><StackPanel><TextBlock Text="🖥️ Screen, weekends" Style="{StaticResource Label}" /><local:IntBox x:Name="ScreenWe" Min="0" Max="1440" Step="15" Suffix="min" /></StackPanel></Border>
-                            </WrapPanel>
-                            <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <TextBlock Text="When screen time runs out" Style="{StaticResource Label}" />
+
+                        <!-- Screen time -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <CheckBox x:Name="ScreenLimitCheck" Style="{StaticResource ToggleSwitch}" Content="🖥️ Screen time budget" FontWeight="SemiBold" FontSize="16"
+                                          Checked="Section_Changed" Unchecked="Section_Changed" />
+                                <TextBlock Style="{StaticResource Hint}" Margin="58,4,0,0" Text="Counts every minute you're signed in and the screen isn't locked." />
+                                <StackPanel x:Name="ScreenLimitBody" Margin="0,16,0,0">
+                                    <WrapPanel>
+                                        <Border Style="{StaticResource TileCard}" Width="250"><StackPanel><TextBlock Text="Weekdays" Style="{StaticResource Label}" /><local:IntBox x:Name="ScreenWd" Min="0" Max="1440" Step="15" Suffix="min" /></StackPanel></Border>
+                                        <Border Style="{StaticResource TileCard}" Width="250"><StackPanel><TextBlock Text="Weekends" Style="{StaticResource Label}" /><local:IntBox x:Name="ScreenWe" Min="0" Max="1440" Step="15" Suffix="min" /></StackPanel></Border>
+                                    </WrapPanel>
+                                    <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,10" Text="0 means no screen limit on those days. The smallest limit is 30 minutes." />
+                                    <TextBlock Text="When it runs out" Style="{StaticResource Label}" />
                                     <local:PillPicker x:Name="LimitPills" />
                                     <StackPanel x:Name="GracePanel" Orientation="Horizontal" Margin="0,6,0,0">
                                         <TextBlock Text="Shutdown notice" VerticalAlignment="Center" Margin="0,0,12,0" />
                                         <local:IntBox x:Name="GraceBox" Min="1" Max="10" Suffix="min" />
                                     </StackPanel>
-                                    <TextBlock Text="Warn me when this much is left" Style="{StaticResource Label}" Margin="0,18,0,8" />
-                                    <local:MultiPills x:Name="WarnAtPills" />
-                                    <WrapPanel Margin="0,12,0,0">
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,28,8">
-                                            <TextBlock Text="A new day starts at" VerticalAlignment="Center" Margin="0,0,12,0" />
-                                            <local:IntBox x:Name="ResetHour" Min="0" Max="23" Suffix=":00" />
-                                        </StackPanel>
-                                        <CheckBox x:Name="LaunchersCheck" Style="{StaticResource ToggleSwitch}" Content="Also close game launchers" Margin="0,0,0,8" />
-                                    </WrapPanel>
                                 </StackPanel>
-                            </Border>
-                            <Expander Header="Fine-tune what counts as a game" FontSize="14">
-                                <StackPanel Margin="4,12,0,4">
-                                    <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,10" Text="Anything running from a game folder counts as a game. Program names are as in Task Manager > Details, without .exe, one per line. Windows' own programs are never closed." />
-                                    <UniformGrid Columns="2">
-                                        <DockPanel Margin="0,0,10,12" Height="170"><TextBlock DockPanel.Dock="Top" Text="Game folders" Style="{StaticResource Label}" /><TextBox x:Name="GameFolders" Style="{StaticResource ListText}" /></DockPanel>
-                                        <DockPanel Margin="0,0,0,12" Height="170"><TextBlock DockPanel.Dock="Top" Text="Extra games" Style="{StaticResource Label}" /><TextBox x:Name="GameProcs" Style="{StaticResource ListText}" /></DockPanel>
-                                        <DockPanel Margin="0,0,10,12" Height="170"><TextBlock DockPanel.Dock="Top" Text="Never count as games" Style="{StaticResource Label}" /><TextBox x:Name="IgnoreProcs" Style="{StaticResource ListText}" /></DockPanel>
-                                        <DockPanel Margin="0,0,0,12" Height="170"><TextBlock DockPanel.Dock="Top" Text="Launchers" Style="{StaticResource Label}" /><TextBox x:Name="LauncherProcs" Style="{StaticResource ListText}" /></DockPanel>
-                                    </UniformGrid>
-                                    <Button Content="📁  Add a game folder..." Style="{StaticResource ChunkyButton}" HorizontalAlignment="Left" Click="AddGameFolder_Click" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Shared by both -->
+                        <Border x:Name="SharedScreenCard" Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Warn me when this much is left" Style="{StaticResource Label}" Margin="0,0,0,8" />
+                                <local:MultiPills x:Name="WarnAtPills" />
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <TextBlock Text="A new day starts at" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                    <local:IntBox x:Name="ResetHour" Min="0" Max="23" Suffix=":00" />
                                 </StackPanel>
-                            </Expander>
-                        </StackPanel>
+                                <TextBlock x:Name="UsageText" Style="{StaticResource Hint}" Margin="0,10,0,0" />
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
 
@@ -413,20 +431,15 @@
                                 <StackPanel>
                                     <DockPanel Margin="0,0,0,8">
                                         <Button DockPanel.Dock="Right" Content="+ Social media list" Style="{StaticResource Chip}" Click="SocialPreset_Click" Margin="0" />
-                                        <TextBlock Text="🌐 Websites (one per line)" Style="{StaticResource H2}" />
+                                        <TextBlock Text="🌐 Websites" Style="{StaticResource H2}" />
                                     </DockPanel>
-                                    <TextBox x:Name="SitesBox" Style="{StaticResource ListText}" Height="170" />
+                                    <local:ListEditor x:Name="SitesEditor" Emoji="🌐" Placeholder="Add a site, like reddit.com" EmptyText="No sites yet." MaxListHeight="260" />
                                 </StackPanel>
                             </Border>
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
                                     <TextBlock Text="📦 Apps (their internet is cut, they aren't closed)" Style="{StaticResource H2}" />
-                                    <ListBox x:Name="AppsList" Height="120" Margin="0,4,0,10" />
-                                    <WrapPanel>
-                                        <Button Content="+ Program..." Style="{StaticResource ChunkyButton}" Margin="0,0,8,0" Click="AddApp_Click" />
-                                        <Button Content="+ Folder..." Style="{StaticResource ChunkyButton}" Margin="0,0,8,0" Click="AddAppFolder_Click" />
-                                        <Button Content="Remove" Style="{StaticResource ChunkyButton}" Click="RemoveApp_Click" />
-                                    </WrapPanel>
+                                    <local:ListEditor x:Name="AppsEditor" IsPath="True" AllowTyping="False" EmptyText="No apps yet. Add a program, or a whole folder like Steam or Discord." MaxListHeight="240" Margin="0,4,0,0" />
                                 </StackPanel>
                             </Border>
                             <TextBlock Text="⏱️ Also block at these times" Style="{StaticResource H2}" Margin="0,6,0,4" />

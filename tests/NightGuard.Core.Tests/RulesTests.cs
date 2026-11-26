@@ -60,6 +60,20 @@ public class SelfLockTests
         Assert.Contains("more programs ignored by screen time", l);
     }
 
+    [Theory]
+    [InlineData("Sleep", "Shutdown", false)]
+    [InlineData("Hibernate", "Shutdown", false)]
+    [InlineData("Sleep", "SignOut", false)]
+    [InlineData("Shutdown", "Hibernate", true)]
+    [InlineData("Shutdown", "Sleep", true)]
+    [InlineData("Hibernate", "Lock", true)]
+    public void Action_strength(string from, string to, bool looser)
+    {
+        var o = Cfg(); o.Action = from;
+        var n = Cfg(); n.Action = to;
+        Assert.Equal(looser, SelfLockRules.Loosening(o, n).Count > 0);
+    }
+
     [Fact]
     public void Unlock_cool_off()
     {

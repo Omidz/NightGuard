@@ -34,6 +34,8 @@ public static class Ops
     public const string Subscribe = "subscribe";
     public const string EnableHibernate = "enableHibernate";
     public const string Log = "log";
+    /// <summary>From the bedtime countdown: don't wait, do the bedtime action now.</summary>
+    public const string ActNow = "actNow";
 }
 
 public static class ErrorKinds
