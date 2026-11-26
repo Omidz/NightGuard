@@ -14,20 +14,15 @@
                 <TextBlock x:Name="Seconds" FontSize="150" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource NgMoon}" />
                 <TextBlock x:Name="Line" FontSize="24" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
                 <TextBlock x:Name="WhyText" FontSize="20" FontStyle="Italic" TextWrapping="Wrap" TextAlignment="Center" Margin="0,24,0,0" Opacity="0.9" />
-                <Button x:Name="SaveFirstButton" Content="&#x1F4BE;  Let me save first" FontSize="18" Padding="26,12" Margin="0,34,0,0"
-                        HorizontalAlignment="Center" Click="SaveFirst_Click" Style="{StaticResource MoonButton}" />
+                <WrapPanel HorizontalAlignment="Center" Margin="0,34,0,0">
+                    <Button x:Name="SaveFirstButton" Content="&#x1F4BE;  Let me save first" FontSize="18" Padding="26,12" Margin="8,0"
+                            Click="SaveFirst_Click" Style="{StaticResource MoonButton}" />
+                    <Button x:Name="ActNowButton" FontSize="18" Padding="26,12" Margin="8,0"
+                            Click="ActNow_Click" Style="{StaticResource ChunkyButton}" />
+                </WrapPanel>
                 <TextBlock x:Name="SmallPrint" FontSize="14" Opacity="0.7" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,16,0,0" />
             </StackPanel>
         </Grid>
 
-        <!-- Compact pill while you save: always on top, never steals your keyboard -->
-        <Border x:Name="PillPanel" Visibility="Collapsed" Padding="18,0">
-            <DockPanel VerticalAlignment="Center">
-                <Button DockPanel.Dock="Right" Content="&#x2922;" ToolTip="Show the full countdown" Padding="10,4" Click="Expand_Click" />
-                <TextBlock Text="&#x1F319;" FontFamily="Segoe UI Emoji" FontSize="26" Foreground="{StaticResource NgMoon}" VerticalAlignment="Center" Margin="0,0,12,0" />
-                <TextBlock x:Name="PillSeconds" FontSize="34" FontWeight="Bold" Foreground="{StaticResource NgMoon}" VerticalAlignment="Center" Margin="0,0,12,0" />
-                <TextBlock x:Name="PillText" FontSize="15" VerticalAlignment="Center" TextWrapping="Wrap" />
-            </DockPanel>
-        </Border>
     </Grid>
 </Window>

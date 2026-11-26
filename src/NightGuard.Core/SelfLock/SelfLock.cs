@@ -43,7 +43,12 @@ public static class SelfLockRules
         return new UnlockInfo(state, req, opens, closes);
     }
 
-    private static readonly Dictionary<string, int> ActionRank = new() { ["Shutdown"] = 3, ["Hibernate"] = 3, ["SignOut"] = 2, ["Sleep"] = 2, ["Lock"] = 1 };
+    // Bedtime action strength: Shutdown is the strongest, then Hibernate, then Sign out / Sleep, then Lock.
+    // Moving to the same or a stronger action is always allowed; a weaker one counts as looser.
+    private static readonly Dictionary<string, int> ActionRank = new() { ["Shutdown"] = 4, ["Hibernate"] = 3, ["SignOut"] = 2, ["Sleep"] = 2, ["Lock"] = 1 };
+
+    /// <summary>How strong a bedtime action is (higher = stricter). Unknown actions are 0.</summary>
+    public static int ActionStrength(string action) => Rank(ActionRank, action);
     private static readonly Dictionary<string, int> ScreenActionRank = new() { ["Shutdown"] = 3, ["Lock"] = 2, ["Warn"] = 1 };
 
     private static int Rank(Dictionary<string, int> table, string key) => table.TryGetValue(key, out var r) ? r : 0;

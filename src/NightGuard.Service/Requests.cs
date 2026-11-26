@@ -43,6 +43,7 @@ internal sealed partial class Engine
                 Ops.CheckIn => CheckIn(client),
                 Ops.EnableHibernate => EnableHibernate(client),
                 Ops.Log => new IpcResponse { Ok = true, Lines = _store.LogTail(200) },
+                Ops.ActNow => ActNow(client),
                 _ => IpcResponse.Fail(ErrorKinds.Invalid, $"Unknown request '{req.Op}'."),
             };
         }
@@ -314,6 +315,19 @@ internal sealed partial class Engine
         }
         _store.AddJournalEntry(client.Sid, entry);
         return IpcResponse.Success("Saved to your journal.");
+    }
+
+    /// <summary>
+    /// "Do it now" on the bedtime countdown. Only ends a countdown that is already running, so it can
+    /// only make bedtime come sooner, never later.
+    /// </summary>
+    private IpcResponse ActNow(ClientInfo client)
+    {
+        if (_bedtimePending is not { } p) return IpcResponse.Fail(ErrorKinds.Invalid, "There's no bedtime countdown running.");
+        _bedtimePending = p with { DueUtc = DateTime.UtcNow };
+        _store.Log($"bedtime: {client.UserName} chose not to wait for the countdown");
+        _ = Task.Run(async () => { await Task.Delay(200).ConfigureAwait(false); await TickAsync().ConfigureAwait(false); });
+        return IpcResponse.Success("Goodnight!");
     }
 
     private IpcResponse EnableHibernate(ClientInfo client)
