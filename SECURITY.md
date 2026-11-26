@@ -1,6 +1,6 @@
 # Security
 
-NightGuard runs scheduled tasks as SYSTEM and edits the hosts file and Windows Firewall, so security bugs matter.
+NightGuard runs a Windows service as SYSTEM, listens on a local named pipe, and edits the hosts file and Windows Firewall, so security bugs matter.
 
 ## Reporting a vulnerability
 
@@ -11,9 +11,10 @@ Useful things to include: what you found, how to reproduce it, and which Windows
 ## What counts
 
 - A standard (non-admin) user getting admin or SYSTEM rights through NightGuard
-- NightGuard changing anything outside its own tasks, firewall group, hosts section or folder
+- A standard user getting the service to do something the self-lock or trusted-person rules don't allow (through the named pipe or otherwise)
+- NightGuard changing anything outside its own service, task, firewall group, hosts section or folders
 - Getting around the trusted-person code without admin rights
-- Getting around the self-lock (the 7-day cool-off before looser settings or uninstall) through the app or its scripts
+- Getting around the self-lock (the 7-day cool-off before looser settings or uninstall) through the app or the service
 - Anything that could leave a PC unusable outside bedtime hours
 
 ## What doesn't

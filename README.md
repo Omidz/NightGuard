@@ -28,61 +28,52 @@ NightGuard warns you before bedtime, then **powers your PC off** (hibernate by d
 
 ## 🚀 Quick start (about two minutes)
 
-1. **Download** [**NightGuard.zip**](https://github.com/Omidz/NightGuard/releases/latest/download/NightGuard.zip) from the [latest release](https://github.com/Omidz/NightGuard/releases/latest). Just that one file. (Link not working? Use the green **Code** button > **Download ZIP** instead, same thing.)
-2. **Unblock it** so Windows doesn't nag: right-click the zip > **Properties** > tick **Unblock** at the bottom > **OK**. (No Unblock box? Fine, skip it.)
-3. **Unzip** it anywhere, for example your Downloads folder.
-4. **Double-click `NightGuard.cmd`** and click **Yes** on the admin prompt. (Blue "Windows protected your PC" screen? Click **More info** > **Run anyway**. More fixes in the SmartScreen section just below.)
-5. **Walk through the wizard.** Pick your bedtimes, warnings and what happens at bedtime. The defaults are sensible, so **Next, Next, Next** is totally fine. One thing we *strongly* recommend: write your **why** on the "Your why and journal" step.
-6. **Install.** On the last step, read the summary, pick where you want shortcuts (Start Menu, Desktop), tick **Yes, these settings are correct**, and click **Install NightGuard**. Done!
+1. **Download** [**NightGuard.msi**](https://github.com/Omidz/NightGuard/releases/latest/download/NightGuard.msi) from the [latest release](https://github.com/Omidz/NightGuard/releases/latest).
+2. **Double-click it** and follow the installer (accept the license, click **Install**, then **Yes** on the admin prompt). Blue "Windows protected your PC" screen? Click **More info** > **Run anyway** (more in the SmartScreen section just below).
+3. **NightGuard opens by itself** when the installer finishes. If it doesn't, open it from the **Start Menu**.
+4. **Walk through the setup.** Pick your bedtimes, warnings and what happens at bedtime. The defaults are sensible, so **Next, Next, Next** is totally fine. One thing we *strongly* recommend: write your **why** on the "Your why and journal" step.
+5. **Start it.** On the last step, read the summary, tick **Yes, these settings are correct**, and click **Start NightGuard**. Done!
 
-**You can delete the downloaded folder now.** NightGuard installs its own copy into `C:\ProgramData\NightGuard` (a protected folder, like Program Files) and runs only from there. Open it again from the **Start Menu** or **Desktop** shortcut. Want it on the taskbar? Right-click NightGuard in the Start Menu > **Pin to taskbar** (Windows doesn't let apps pin themselves).
+**What got installed:** the NightGuard app in `C:\Program Files\NightGuard`, and a small **Windows service** that does the guarding. The service starts with Windows, before anyone signs in, and restarts itself if anything stops it. Closing the NightGuard window (or the tray icon) doesn't stop anything; that's on purpose. Want it on the taskbar? Right-click NightGuard in the Start Menu > **Pin to taskbar**.
 
-Needs Windows 10 or 11. Nothing else to install: it uses the PowerShell that's already on every Windows PC.
+Needs 64-bit Windows 10 or 11. Nothing else to install: the installer brings everything it needs.
+
+**Already using the PowerShell version?** Just install the MSI. Your settings, trusted-person code, unlock request, streak and journal all carry over, and the old scheduled tasks and scripts are removed.
 
 ### 🌙 What happens tonight
 
 - **30 and 5 minutes before bedtime:** a popup (with a sound) jumps in front of whatever you're doing and tells you to wrap up and save. The last one reminds you why you started.
-- **At bedtime:** a 60-second countdown, then the PC hibernates. Your open stuff is saved to disk, usually.
+- **At bedtime:** a full-screen 60-second countdown (even over your game; shrink it to save first), then the PC hibernates. Your open stuff is saved to disk, usually.
 - **Switch it back on before unlock time?** About a minute later: countdown, hibernate. Repeat until you give up and sleep. 😴
 - **After unlock time:** your PC is back to normal, and your apps are where you left them. Waking it from last night's hibernate won't set off a leftover countdown: anything NightGuard started before the PC went to sleep is cancelled on wake-up, and it double-checks the clock before it ever acts.
 - **Your first sign-in of the day:** a morning check-in pops up to congratulate you (or gently roast you), shows your streak, and lets you log your mood. Or just click **Skip**.
 
 ### 🧪 Not sure yet? Test drive it first
 
-- **During the day, no install needed:** on the Warnings step, click **Preview** on a popup and **Preview the bedtime countdown**. That's exactly what you'll see at night.
-- **One-night trial:** on the At bedtime step, tick **Stop after an end date** and pick *today*. NightGuard guards tonight only, then removes itself in the morning. Liked it? Install it for real.
+- **During the day, nothing to commit to:** on the Warnings step, click **Preview** on a popup and **Preview the bedtime countdown**. That's exactly what you'll see at night.
+- **One-night trial:** on the At bedtime step, tick **Stop after this last locked night** and pick *today*. NightGuard guards tonight only, then removes itself in the morning. Liked it? Install it again for real.
 
 Because of the [7-day cool-off](#-no-easy-take-backs-the-self-lock), choose your settings with care. Stricter is always easy, looser takes a week.
 
 ### 🛡️ "Windows protected your PC" / SmartScreen blocked it?
 
-Totally normal. Windows is suspicious of anything downloaded from the internet that isn't from a big company. Pick **one** of these fixes:
+Totally normal. The installer isn't code-signed yet, and Windows is suspicious of anything downloaded from the internet that isn't from a big company. Pick **one** of these fixes:
 
 **Fix 1: Click past it.** On the blue screen, click **More info**, then **Run anyway**.
 
-**Fix 2: Unblock the zip *before* unzipping.** Right-click the downloaded `.zip` > **Properties** > tick **Unblock** at the bottom > **OK**. Then unzip it again (replace the old folder). Now `NightGuard.cmd` opens normally.
+**Fix 2: Unblock it first.** Right-click the downloaded `NightGuard.msi` > **Properties** > tick **Unblock** at the bottom > **OK**. Then double-click it again.
 
-**Fix 3: Paste one command (works when the others don't).**
-
-1. Open the unzipped folder in File Explorer.
-2. Right-click an empty spot > **Open in Terminal**. (Windows 10: **File > Open Windows PowerShell**.)
-3. Paste this and press Enter:
-
-   ```powershell
-   Get-ChildItem | Unblock-File; powershell -NoProfile -ExecutionPolicy Bypass -File .\gui.ps1
-   ```
-
-4. Click **Yes** on the admin prompt.
-
-Once it's installed, the Start Menu shortcut won't be blocked again.
+Once it's installed, Windows won't ask again.
 
 ---
 
 ## 🎛️ Settings
 
-NightGuard opens as a step-by-step wizard. Use **Next** and **Back**, or jump to any step in the list on the left. Nothing is installed or changed until the last step, **Review and install**: read the summary, tick **Yes, these settings are correct**, and the **Install NightGuard** button appears (it says **Save and apply** once NightGuard is installed). To change something later, open NightGuard again and go straight to that step. Stricter changes save right away; looser ones need the [7-day cool-off](#-no-easy-take-backs-the-self-lock).
+NightGuard opens as a step-by-step wizard. Use **Next** and **Back**, or jump to any step in the list on the left. Nothing changes until the last step, **Review and save**: read the summary, tick **Yes, these settings are correct**, and the **Start NightGuard** button appears (it says **Save and apply** once NightGuard is running). To change something later, open NightGuard again (Start Menu, or double-click the moon in the tray) and go straight to that step. Stricter changes save right away; looser ones need the [7-day cool-off](#-no-easy-take-backs-the-self-lock). The review page lists anything that counts as looser before you save.
 
-Sections you switch off (like screen time or blocking) are greyed out, so you can see at a glance what's on. **Status and log** and **Request uninstall** live at the bottom left, out of the wizard's way.
+Sections you switch off (like screen time or blocking) are greyed out, so you can see at a glance what's on. **My journal**, **Status and log** and **Request uninstall** live at the bottom left, out of the wizard's way.
+
+**Changing settings needs an administrator account.** On a standard account you can look around and preview everything; NightGuard shows an **Open as administrator** button for saving. (That's also the setup we recommend: a standard account day to day, and someone you trust keeps the admin password.)
 
 Times are shown the same way as your Windows clock: 12-hour with AM/PM, or 24-hour. Each time box is labelled with the format it uses. Click the hour or minute and use the arrows, or just type.
 
@@ -94,10 +85,12 @@ Times are shown the same way as your Windows clock: 12-hour with AM/PM, or 24-ho
 | **Your why and journal** | Your reason, in your words (highly recommended). Morning check-in, streaks and badges on or off. | Check-in on |
 | **Game and screen time** | Daily game and screen time budgets (weekdays and weekends), warnings, what happens when time runs out, which programs count as games | Off (1 h games / 4 h screen on weekdays, 2 h / 6 h at weekends when you turn it on) |
 | **Block sites and apps** | Websites, apps or whole folders to block, and when | Off (a social media list is ready to go) |
-| **Trusted person** | Turn on the code lock. Your trusted person types their own code when you install or save. | Off |
-| **Review and install** | Check everything, pick shortcuts (Start Menu, Desktop), confirm, install. | Start Menu shortcut |
+| **Trusted person** | Turn on the code lock. Your trusted person types their own code when you save. | Off |
+| **Review and save** | Check everything (including what counts as looser than now), desktop shortcut, confirm, save. | Start Menu shortcut |
 
 **How nights are named:** after the evening they start. A bedtime before 12:00 counts as *after midnight*, so "Mon 00:30" means 12:30 AM, early Tuesday.
+
+**Time zones:** your bedtimes follow the time zone the PC had when you last saved. Switching the PC's time zone at 11 PM doesn't move bedtime. Travelling? Save your settings again in the new time zone (moving west counts as looser, since bedtime then comes later in real time).
 
 ### ✍️ Writing popups that actually work on you
 
@@ -123,7 +116,7 @@ Click **Fill in example messages** on the Warnings step to start from these, and
 **About Hibernate.** It's the default because it's strong *and* kind: the PC really powers off, but your open apps come back when you switch it on again (and if you switch it on during locked hours, it hibernates again after the countdown). Two honest caveats:
 
 - **It usually keeps your unsaved work, but it can't guarantee it.** A game that's online may disconnect, a Windows update or a power cut can still lose things. Save at the warnings anyway.
-- **Hibernate has to be switched on in Windows.** It's off on many desktop PCs. When you install with Hibernate picked, NightGuard checks and, **if you say yes**, turns it on for you (`powercfg /hibernate on`). Windows then sets aside some disk space for it (a file about half the size of your RAM). If you say no, or your PC can't hibernate, NightGuard **shuts down instead**. Uninstalling NightGuard leaves the Windows hibernate setting as it is.
+- **Hibernate has to be switched on in Windows.** It's off on many desktop PCs. When you save with Hibernate picked, NightGuard checks and, **if you say yes**, turns it on for you (`powercfg /hibernate on`). Windows then sets aside some disk space for it (a file about half the size of your RAM). If you say no, or your PC can't hibernate, NightGuard **shuts down instead**. Uninstalling NightGuard leaves the Windows hibernate setting as it is.
 
 ---
 
@@ -163,7 +156,7 @@ Turn them on in the **Game and screen time** step.
 
 NightGuard treats itself like a commitment, because "I'll just turn it off tonight" is exactly the problem.
 
-- **Opening NightGuard again** (from the Start Menu or the downloaded folder) shows that it's already installed, when its last night is, and what you can change. It never offers a quick uninstall.
+- **Opening NightGuard again** shows that it's on duty, when its last night is, and what you can change. It never offers a quick uninstall, and **Uninstall** in Windows Settings is switched off (it points you back to the app).
 - **Stricter changes save right away:** earlier bedtime, more nights, more blocked sites, less game time, a stronger bedtime action.
 - **Looser changes need an unlock:** later bedtime, fewer nights, removing blocks, more game time, a weaker action, a longer countdown. NightGuard lists what's looser and offers to **request an unlock**.
 - **The unlock has a 7-day cool-off.** After it, you have 3 days to make looser changes or uninstall, once. Then it locks again. You can cancel a request anytime.
@@ -172,9 +165,12 @@ NightGuard treats itself like a commitment, because "I'll just turn it off tonig
 - **Trusted-person mode on?** Your trusted person's code skips the cool-off (for changes and uninstall).
 - **Night mode** still applies: during the last hour before bedtime and through the night, nothing can be changed at all.
 
-Honest note: this is a speed bump for your 1 AM brain, not a prison. A Windows administrator can still [remove NightGuard by hand](#-removing-it-by-hand-last-resort), and could even fiddle with the clock. If you want it airtight, use a standard (non-admin) Windows account day to day and let someone you trust keep the admin password.
+- **Closing the app does nothing.** The guarding is done by a Windows service. If the tray app is closed or killed, the service starts it again; if the service is stopped, a watchdog starts it again within 5 minutes, and Windows restarts it if it crashes.
+- **Moving the clock forward** while NightGuard runs doesn't shorten the cool-off: the request moves forward by the same amount. Changing the time zone doesn't move bedtime (see [time zones](#-settings)).
 
-What a **standard account** can't do to dodge it: change NightGuard's files or tasks, change the clock, outrun it with the time zone (NightGuard pins the time zone it was installed in; switching zones for real needs an unlock), cancel the bedtime shutdown, or close the countdown to skip the lock. What still gets past it: Safe Mode (on purpose, so you're never truly locked out), changing the clock in the BIOS, and for app blocking, copying the app somewhere else.
+Honest note: this is a speed bump for your 1 AM brain, not a prison. A Windows administrator can still [remove NightGuard by hand](#-removing-it-by-hand-last-resort). If you want it airtight, use a standard (non-admin) Windows account day to day and let someone you trust keep the admin password.
+
+What a **standard account** can't do to dodge it: stop the service, change NightGuard's files or settings, change the clock, outrun it with the time zone (NightGuard pins the time zone of your last save), cancel the bedtime shutdown, or close the countdown to skip it. What still gets past it: Safe Mode (on purpose, so you're never truly locked out), changing the clock in the BIOS, and for app blocking, copying the app somewhere else.
 
 ## 🔐 Trusted-person mode
 
@@ -184,7 +180,7 @@ How it works:
 
 1. Tick **Use a trusted-person code** on the Trusted person step.
 2. On the last step, NightGuard double-checks you really understand the risk before the Install button appears.
-3. Right after you click **Install** (or **Save**), hand the keyboard to your trusted person. They type their code twice, hidden. **NightGuard never shows, emails or prints it**, so you never see it. That's the whole point.
+3. When you click **Start NightGuard** (or **Save and apply**), hand the keyboard to your trusted person. They type their code twice, hidden. **NightGuard never shows, emails or prints it**, so you never see it. That's the whole point.
 
 Too-easy codes like `12345678`, `00000000`, `12121212` or a birthday are refused.
 
@@ -211,7 +207,7 @@ Things that still work without the code, so you're never truly stuck:
 
 - **Websites** are blocked through a clearly marked section of the Windows `hosts` file.
 - **Apps** are blocked with Windows Firewall rules in a group called `NightGuard`. This cuts the app's internet; it doesn't close the app. Add a whole folder (like your Steam or Discord folder) to block everything inside it.
-- Blocks switch on and off on schedule (checked every 5 minutes) and are **removed automatically** when the time slot ends, on uninstall, or if anything goes wrong.
+- Blocks switch on and off on schedule (checked every minute) and are **removed automatically** when the time slot ends, on uninstall, or if anything goes wrong. Deleting the block by hand doesn't stick: it's put back within a minute.
 - Windows-critical sites (Microsoft, Windows Update, sign-in, security certificates) and Windows' own folders can't be blocked, so you can't break your PC by accident.
 
 **Browser loophole:** browsers with "secure DNS" (DNS over HTTPS) turned on can skip the hosts file. Turn it off to make site blocking stick:
@@ -226,11 +222,11 @@ Things that still work without the code, so you're never truly stuck:
 
 NightGuard was built to be strict at night and harmless otherwise:
 
-- It only creates **its own scheduled tasks** (all in a `NightGuard` folder in Task Scheduler), **its own firewall rules** (group `NightGuard`), **one marked section in the hosts file**, its folder in `C:\ProgramData\NightGuard` (settings, log and journal live there), and Start Menu shortcuts. The only Windows setting it may change is turning hibernate on, and only if you say yes. Nothing touches boot settings, drivers, accounts, or your network setup.
+- It only creates **its own Windows service** (`NightGuard`), **one watchdog scheduled task** (in a `NightGuard` folder in Task Scheduler), **its own firewall rules** (group `NightGuard`), **one marked section in the hosts file**, its program folder `C:\Program Files\NightGuard`, its data folder `C:\ProgramData\NightGuard` (settings, log and journal live there), and shortcuts. The only Windows setting it may change is turning hibernate on, and only if you say yes. Nothing touches boot settings, drivers, accounts, or your network setup.
 - Settings that could cause a shutdown loop are refused: a night can be at most 16 hours, and there must be at least 6 free hours between nights.
 - There's always a countdown of at least 15 seconds before anything happens.
 - **Damaged settings or a wrong clock?** NightGuard does nothing rather than risk a shutdown loop. If the settings file can't be read, or the clock is earlier than when the settings were saved (for example after a BIOS reset), it stands down and writes why in the log.
-- **Safe Mode is always safe:** NightGuard never acts in Safe Mode.
+- **Safe Mode is always safe:** the service doesn't run in Safe Mode, and would do nothing there if it did.
 - **Resume-safe.** Every countdown is timed by the real clock. If the PC goes to sleep or hibernates in the middle of one, that countdown is dropped when it wakes up, and a fresh check decides what (if anything) happens. So hibernating at midnight and switching on at 10 AM gives you a normal morning, not a surprise hibernate.
 - If blocking hits an error, it removes the blocks rather than leaving things half-blocked.
 
@@ -239,12 +235,23 @@ NightGuard was built to be strict at night and harmless otherwise:
 The normal way is **Request uninstall** at the bottom left of the app (7-day cool-off), or the trusted person's code. If you can't use those (lost code, something broken, a real emergency) and you're a Windows admin, open **PowerShell as administrator** and run:
 
 ```powershell
+$p = Get-ChildItem HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall | Get-ItemProperty | Where-Object DisplayName -eq 'NightGuard'
+Start-Process msiexec.exe -Wait -ArgumentList "/x $($p.PSChildName) NIGHTGUARD_UNINSTALL=1"
+```
+
+That runs the normal uninstaller, which also removes the service, the watchdog task, the blocks, the shortcuts and `C:\ProgramData\NightGuard`.
+
+If even that fails, this removes everything step by step:
+
+```powershell
 Get-ScheduledTask -TaskPath '\NightGuard\' | Unregister-ScheduledTask -Confirm:$false
+Stop-Service NightGuard -Force; sc.exe delete NightGuard
+Get-Process NightGuard -ErrorAction SilentlyContinue | Stop-Process -Force
 Get-NetFirewallRule -Group 'NightGuard' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
 $h = "$env:SystemRoot\System32\drivers\etc\hosts"
 (Get-Content $h -Raw) -replace '(?ms)^# >>> NightGuard BEGIN.*?^# <<< NightGuard END[^\n]*\n?', '' | Set-Content $h -NoNewline
-cmd /c rmdir /s /q "$env:ProgramData\NightGuard"
-Remove-Item "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\NightGuard*.lnk"
+cmd /c rmdir /s /q "$env:ProgramData\NightGuard" "$env:ProgramFiles\NightGuard"
+Remove-Item "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\NightGuard*.lnk", "$env:PUBLIC\Desktop\NightGuard.lnk" -ErrorAction SilentlyContinue
 ```
 
 If it's during locked hours, boot into **Safe Mode** first (hold **Shift** while clicking **Restart** > Troubleshoot > Advanced options > Startup Settings > Restart > **4**) and run it there.
@@ -253,7 +260,7 @@ If it's during locked hours, boot into **Safe Mode** first (hold **Shift** while
 
 ## 🧪 Try it before you trust it
 
-NightGuard is young. It's built carefully, but it hasn't been battle-tested on lots of PCs yet. Do the [test drive](#-not-sure-yet-test-drive-it-first) first: previews during the day, then a one-night trial with the end date set to today. It removes itself in the morning, and you install it for real with your settings dialled in.
+NightGuard 2 is a fresh rewrite as a real Windows app. It's built carefully and its rules are covered by automated tests, but it hasn't been battle-tested on lots of PCs yet. Do the [test drive](#-not-sure-yet-test-drive-it-first) first: previews during the day, then a one-night trial with the end date set to today. It removes itself in the morning, and you install it for real with your settings dialled in.
 
 Something weird? [Open an issue](../../issues). Bug reports from fellow procrastinators are very welcome (ideally filed before midnight 😉).
 
@@ -261,25 +268,32 @@ Something weird? [Open an issue](../../issues). Bug reports from fellow procrast
 
 ## 🗂️ What's in the box
 
-| File | What it does |
+NightGuard 2 is written in C# (.NET 10) and has three parts:
+
+| Part | What it does |
 |---|---|
-| `NightGuard.cmd` | Double-click to open NightGuard |
-| `TextMenu.cmd` | A text-only menu, in case the window ever misbehaves |
-| `gui.ps1` | The NightGuard window |
-| `menu.ps1` | The text menu |
-| `install.ps1` / `uninstall.ps1` | Save settings and set up tasks / remove everything |
-| `enforce.ps1` | Runs at night as SYSTEM: shutdown, sleep or hibernate |
-| `session.ps1` | Shows the countdown, and locks or signs out |
-| `warn.ps1` | The warning popups |
-| `blocker.ps1` | Turns site and app blocking on and off |
-| `tracker.ps1` | Counts game and screen time every minute |
-| `notify.ps1` | Screen time popups |
-| `checkin.ps1` | The morning check-in popup, streaks, badges and journal |
-| `common.ps1` | Shared code. The top of the file documents every setting. |
+| **NightGuard service** (`NightGuard.Service.exe`) | Runs as a Windows service (LocalSystem), always on, even before anyone signs in. Does all the enforcing: warnings, the bedtime countdown and action, site and app blocking, game and screen time, the end date. Checks every request against night mode, the self-lock and the trusted person's code. |
+| **NightGuard app** (`NightGuard.exe`) | The settings window, and a small tray app the service starts for every signed-in user to show warnings, the countdown and the morning check-in. It never enforces anything itself, so closing it changes nothing. |
+| **Installer** (`NightGuard.msi`) | Installs both, sets the service to restart itself if it fails, adds the Start Menu shortcut, and on uninstall removes everything NightGuard created. |
 
-Settings are saved in `C:\ProgramData\NightGuard\config.json`, and there's a log in `log.txt` next to it.
+The service and the app talk over a local named pipe that only signed-in users can use. Settings are saved in `C:\ProgramData\NightGuard\config.json`, with a log in `log.txt` next to it (also under **Status and log** in the app). The format is the same as the PowerShell version's, so upgrades carry everything over.
 
-**Upgrading from "Bedtime Lock"** (NightGuard's old name) or the separate **Screen Limits** tool? Just install NightGuard. It carries over your settings (and today's usage) and removes the old versions.
+Source layout: `src/NightGuard.Core` (all the rules, unit tested), `src/NightGuard.Service`, `src/NightGuard.App`, `installer/` (WiX), `tests/`. The original PowerShell version is kept in `legacy/` for reference.
+
+**Upgrading from the PowerShell version, "Bedtime Lock" or the separate "Screen Limits" tool?** Just install the MSI. It carries over your settings (and today's usage) and removes the old versions.
+
+### Building it yourself
+
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/download). The rules and tests build anywhere; the app, service and installer need Windows.
+
+```powershell
+dotnet test tests/NightGuard.Core.Tests
+dotnet publish src/NightGuard.App -c Release -r win-x64 --self-contained -o out\publish
+dotnet publish src/NightGuard.Service -c Release -r win-x64 --self-contained -o out\publish
+dotnet build installer/NightGuard.Installer.wixproj -c Release -p:PublishDir=$PWD\out\publish\ -o out\msi
+```
+
+GitHub Actions does the same on every push and attaches `NightGuard.msi` to releases tagged `v*`.
 
 ---
 
@@ -292,10 +306,10 @@ Request an unlock (or uninstall) in the app and wait out the 7-day cool-off. If 
 That's exactly the kind of thing NightGuard is here to stop. During the day you can make it stricter anytime; looser takes the 7-day cool-off.
 
 **Does it spy on me or phone home?**
-No. No internet, no accounts, no tracking. Your mood journal never leaves the PC. It's a few PowerShell scripts you can read.
+No. No internet, no accounts, no tracking. Your mood journal never leaves the PC. The source is all here to read.
 
 **I'm travelling. Does it follow my time zone?**
-NightGuard keeps the time zone it was installed in (otherwise changing the time zone would be a one-click escape, and anyone can do that without admin rights). Moving for real? Request an unlock, wait out the cool-off, then save your settings again in the new time zone. With trusted-person mode, the code does it right away.
+NightGuard keeps the time zone you last saved your settings in (otherwise changing the time zone would be a one-click escape, and anyone can do that without admin rights). Moving for real? Change the Windows time zone, then save your settings again. Heading east is stricter (bedtime comes sooner) and saves right away; heading west counts as looser, so it needs the cool-off or your trusted person's code.
 
 **I work night shifts.**
 Set your own bedtime and unlock time per night. Any time works, as long as there are at least 6 free hours between nights.
@@ -304,16 +318,19 @@ Set your own bedtime and unlock time per night. Any time works, as long as there
 With Shutdown, yes, after the countdown. With Hibernate (the default) your game is usually still there when you switch the PC back on, but don't bet your save file on it. That's why there are warnings. Save at the 5-minute warning. 🙂
 
 **Will the warnings show up over my fullscreen game?**
-Almost always. Warnings and the countdown are always-on-top windows that pull themselves to the front (and keep doing it every second), play a sound, and also send a Windows notification as a backup. Most games today run in *borderless* fullscreen, where that works fine. A few older games use *exclusive* fullscreen, which nothing can draw over. There, grabbing focus usually knocks the game back to the desktop so you see the warning; if a game refuses, you'll still hear the sound. Either way, bedtime still happens on time. Tip: switch your game to borderless or windowed fullscreen to be sure.
+The bedtime countdown will. It takes over the whole screen your game is on, and if a game in *exclusive* fullscreen keeps it hidden, NightGuard minimises the game. Need to save? Click **Let me save first** and it shrinks to a small bar on top of the screen while you save; 10 seconds before the end it takes over the screen again (and closing it doesn't stop it). The earlier warnings are always-on-top popups that pull themselves to the front, with a sound and a Windows notification as backup. They get through *borderless* fullscreen (most games today); in *exclusive* fullscreen you'll at least hear them. Tip: switch your game to borderless or windowed fullscreen to see every warning.
 
-**Can I delete the folder I downloaded?**
-Yes. NightGuard copies itself to `C:\ProgramData\NightGuard` and runs only from there. The shortcuts point there too.
+**Can I delete the installer I downloaded?**
+Yes. NightGuard is installed in `C:\Program Files\NightGuard` and runs from there.
+
+**I closed the tray icon / killed NightGuard in Task Manager. Is it off now?**
+No. The tray app only shows things; the Windows service does the guarding, and it starts the tray app again within seconds.
 
 **Will it slow down my PC or my games?**
-Nope. NightGuard isn't a program that sits in the background. Windows wakes a tiny script now and then (every minute for screen time or at night, every 5 minutes for blocking), it does its thing in a second or two, and it's gone again. No always-on background app, no meaningful memory use. Your FPS won't notice. Your sleep schedule will.
+Nope. The service wakes up for a moment every few seconds to check the time, and once a minute for blocking and screen time; the rest of the time it sleeps. The tray app hands its memory back to Windows whenever its windows are closed. Your FPS won't notice. Your sleep schedule will.
 
 **Why does it repeat every minute at night? Isn't that a lot?**
-Each check is a blink, and only during locked hours. Every minute means that if you switch the PC back on at 2 AM, you get about a minute before it goes back to bed. You can make it less often on the At bedtime step, but where's the fun in that.
+Each check is a blink. Every minute means that if you switch the PC back on at 2 AM, you get about a minute before it goes back to bed. You can make it less often on the At bedtime step, but where's the fun in that.
 
 ---
 
