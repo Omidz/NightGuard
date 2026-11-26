@@ -64,21 +64,28 @@ internal sealed class PipeServer(Engine engine, AgentHub agents, Store store)
         }
     }
 
-    private static ClientInfo? Identify(NamedPipeServerStream pipe)
+    /// <summary>
+    /// Who is on the other end, from Windows (never from the request): the pipe tells us the client's
+    /// process, and the service reads that process's token. No impersonation is involved: the app
+    /// connects at Identification level, where WindowsIdentity.GetCurrent() inside RunAsClient fails
+    /// (ERROR_BAD_IMPERSONATION_LEVEL), which made every request "Couldn't tell who is asking".
+    /// </summary>
+    private ClientInfo? Identify(NamedPipeServerStream pipe)
     {
-        ClientInfo? info = null;
         try
         {
-            pipe.RunAsClient(() =>
-            {
-                using var id = WindowsIdentity.GetCurrent(TokenAccessLevels.Query);
-                info = new ClientInfo(id.User!, id.Name, Native.IsAdminAccount(id), 0);
-            });
+            var handle = pipe.SafePipeHandle.DangerousGetHandle();
+            if (!Native.GetNamedPipeClientProcessId(handle, out var pid) || pid == 0) { store.Log("couldn't identify a caller: no client process id"); return null; }
+            using var id = Native.ProcessIdentity(pid);
+            if (id?.User is null) { store.Log($"couldn't identify a caller: no token for process {pid}"); return null; }
+            Native.GetNamedPipeClientSessionId(handle, out var session);
+            return new ClientInfo(id.User, id.Name, Native.IsAdminAccount(id), session);
         }
-        catch { return null; }
-        if (info is null) return null;
-        Native.GetNamedPipeClientSessionId(pipe.SafePipeHandle.DangerousGetHandle(), out var session);
-        return info with { SessionId = session };
+        catch (Exception e)
+        {
+            store.Log($"couldn't identify a caller: {e.Message}");
+            return null;
+        }
     }
 
     private async Task ServeAsync(NamedPipeServerStream pipe, CancellationToken ct)

@@ -190,6 +190,26 @@ internal static class Native
     [DllImport("kernel32.dll", SetLastError = true)]
     public static extern bool GetNamedPipeClientSessionId(IntPtr pipe, out int sessionId);
 
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool GetNamedPipeClientProcessId(IntPtr pipe, out int processId);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
+
+    /// <summary>The user a process runs as (its token), or null. The service runs as SYSTEM, so it may read any user's process.</summary>
+    public static WindowsIdentity? ProcessIdentity(int pid)
+    {
+        var process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (process == IntPtr.Zero) return null;
+        try
+        {
+            if (!OpenProcessToken(process, 0x0008 /* TOKEN_QUERY */ | 0x0002 /* TOKEN_DUPLICATE */, out var token)) return null;
+            try { return new WindowsIdentity(token); }   // keeps its own copy of the token
+            finally { CloseHandle(token); }
+        }
+        finally { CloseHandle(process); }
+    }
+
     [DllImport("advapi32.dll", SetLastError = true)]
     private static extern bool GetTokenInformation(IntPtr token, int infoClass, IntPtr info, int length, out int returnLength);
 
