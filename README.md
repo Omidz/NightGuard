@@ -290,7 +290,7 @@ The service and the app talk over a local named pipe that only signed-in users c
 
 Source layout: `src/NightGuard.Core` (all the rules, unit tested), `src/NightGuard.Service`, `src/NightGuard.App`, `installer/` (WiX), `tests/`.
 
-**Upgrading from the PowerShell version, "Bedtime Lock" or the separate "Screen Limits" tool?** Just install the MSI. It carries over your settings (and today's usage) and removes the old versions.
+**Upgrading from NightGuard 1 (the PowerShell version)?** Just install the MSI. It carries over your settings (and today's usage) and removes the old version.
 
 ### Building it yourself
 

@@ -90,11 +90,13 @@ internal sealed class PipeServer(Engine engine, AgentHub agents, Store store)
 
     private async Task ServeAsync(NamedPipeServerStream pipe, CancellationToken ct)
     {
+        // Identify the caller as soon as it connects, while its process is certainly alive, so a process id
+        // can't be recycled by some other program between connecting and asking.
+        var client = Identify(pipe);
         using var firstRead = CancellationTokenSource.CreateLinkedTokenSource(ct);
         firstRead.CancelAfter(TimeSpan.FromSeconds(30));
         var req = await Wire.ReadAsync<IpcRequest>(pipe, firstRead.Token).ConfigureAwait(false);
-        if (req is null) return;
-        var client = Identify(pipe);
+        if (req is null || !pipe.IsConnected) return;
         if (client is null)
         {
             await Wire.WriteAsync(pipe, IpcResponse.Fail(ErrorKinds.Failed, "Couldn't tell who is asking."), ct).ConfigureAwait(false);
@@ -102,6 +104,12 @@ internal sealed class PipeServer(Engine engine, AgentHub agents, Store store)
         }
         if (req.Op == Ops.Subscribe)
         {
+            // One tray app per session needs one connection; a few spare for restarts, never all of them
+            if (agents.SubscriptionCount(client.SessionId) >= 3)
+            {
+                await Wire.WriteAsync(pipe, IpcResponse.Fail(ErrorKinds.Failed, "Too many NightGuard apps are listening in this session."), ct).ConfigureAwait(false);
+                return;
+            }
             await Wire.WriteAsync(pipe, IpcResponse.Success(), ct).ConfigureAwait(false);
             await agents.RunSubscriptionAsync(pipe, client.SessionId, ct).ConfigureAwait(false);
             return;

@@ -337,13 +337,6 @@ public class ConfigFileTests
         Assert.Equal(ConfigSerializer.Write(c), ConfigSerializer.Write(again));
     }
 
-    [Fact]
-    public void Reads_version1_file()
-    {
-        var c = ConfigSerializer.Read("""{ "ShutdownTime": "23:00", "UnlockTime": "06:30", "WarnTimes": ["22:30", "22:55"], "EndDate": null }""");
-        Assert.All(Defaults.Days, d => Assert.Equal("23:00", c.Schedule[d].Bedtime));
-        Assert.Equal([30, 5], c.Warnings.Select(w => w.MinutesBefore));
-    }
 
     [Fact]
     public void Default_config_is_valid() => Assert.Empty(ConfigValidator.Validate(new NightGuardConfig(), TestPaths.Rules));

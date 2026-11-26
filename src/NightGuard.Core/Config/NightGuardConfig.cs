@@ -84,7 +84,6 @@ public sealed class NightGuardConfig
     public string Plan { get; set; } = "";
     public int? CommitNights { get; set; }
     public string? CommitStart { get; set; }
-    public bool ShortcutStartMenu { get; set; } = true;
     public bool ShortcutDesktop { get; set; }
     public BlockingSettings Blocking { get; set; } = new();
     public ScreenTimeSettings ScreenTime { get; set; } = new();
