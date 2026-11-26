@@ -15,7 +15,7 @@
                 <TextBlock x:Name="Line" FontSize="24" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
                 <TextBlock x:Name="WhyText" FontSize="20" FontStyle="Italic" TextWrapping="Wrap" TextAlignment="Center" Margin="0,24,0,0" Opacity="0.9" />
                 <Button x:Name="SaveFirstButton" Content="&#x1F4BE;  Let me save first" FontSize="18" Padding="26,12" Margin="0,34,0,0"
-                        HorizontalAlignment="Center" Click="SaveFirst_Click" Style="{DynamicResource AccentButtonStyle}" />
+                        HorizontalAlignment="Center" Click="SaveFirst_Click" Style="{StaticResource MoonButton}" />
                 <TextBlock x:Name="SmallPrint" FontSize="14" Opacity="0.7" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,16,0,0" />
             </StackPanel>
         </Grid>

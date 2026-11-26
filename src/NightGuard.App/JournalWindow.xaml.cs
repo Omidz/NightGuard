@@ -51,8 +51,10 @@ public partial class JournalWindow : Window
             : "\nAll badges earned. A full year. You absolute legend. 👑";
         BadgeText.Text = badgeText;
         WhyText.Text = string.IsNullOrWhiteSpace(s?.Why)
-            ? "Why I started: not written yet. Add it on the \"Your why and journal\" step. Highly recommended!"
-            : $"💬 Why I started: “{s.Why}”";
+            ? "No why written yet. Add it on the \"Your why\" step: it's the most useful sentence you'll write this week."
+            : $"“{s.Why}”";
+        PlanText.Text = string.IsNullOrWhiteSpace(s?.Plan) ? "" : $"My plan: when the final call pops up, I will {s.Plan}";
+        PlanText.Visibility = PlanText.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void Export_Click(object sender, RoutedEventArgs e)

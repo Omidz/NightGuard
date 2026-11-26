@@ -32,7 +32,9 @@ internal static class FunDialog
         var root = new DockPanel();
         var header = new Border { Background = bg, Padding = new Thickness(22, 16, 22, 16) };
         var hp = new StackPanel { Orientation = Orientation.Horizontal };
-        hp.Children.Add(Art.Emoji(emoji, 30));
+        if (mood is Mood.Info or Mood.Happy or Mood.Question)
+            hp.Children.Add(new Owl { Width = 50, Height = 54, Bob = false, Mood = mood == Mood.Happy ? OwlMood.Happy : OwlMood.Awake });
+        else hp.Children.Add(Art.Emoji(emoji, 30));
         hp.Children.Add(new TextBlock { Text = title, Foreground = Brushes.White, FontSize = 20, FontWeight = FontWeights.SemiBold, Margin = new Thickness(14, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
         header.Child = hp;
         DockPanel.SetDock(header, Dock.Top);
@@ -42,12 +44,13 @@ internal static class FunDialog
         body.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, FontSize = 14, LineHeight = 21 });
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 20, 0, 0) };
         var yesButton = new Button { Content = yes, MinWidth = 100, Padding = new Thickness(16, 8, 16, 8), IsDefault = !defaultNo };
-        yesButton.SetResourceReference(FrameworkElement.StyleProperty, "AccentButtonStyle");
+        yesButton.SetResourceReference(FrameworkElement.StyleProperty, "MoonButton");
         yesButton.Click += (_, _) => w.DialogResult = true;
         buttons.Children.Add(yesButton);
         if (no is not null)
         {
-            var noButton = new Button { Content = no, MinWidth = 100, Padding = new Thickness(16, 8, 16, 8), Margin = new Thickness(10, 0, 0, 0), IsCancel = true, IsDefault = defaultNo };
+            var noButton = new Button { Content = no, MinWidth = 100, Margin = new Thickness(10, 0, 0, 0), IsCancel = true, IsDefault = defaultNo };
+            noButton.SetResourceReference(FrameworkElement.StyleProperty, "ChunkyButton");
             buttons.Children.Add(noButton);
             if (defaultNo) w.Loaded += (_, _) => noButton.Focus();
         }

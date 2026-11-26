@@ -21,7 +21,14 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        ThemeMode = ThemeMode.System;
+        // Always the night theme: dark Windows 11 controls, recoloured by Theme.xaml
+        ThemeMode = ThemeMode.Dark;
+        var ours = Resources.MergedDictionaries.FirstOrDefault(d => d.Source?.OriginalString.EndsWith("Theme.xaml", StringComparison.OrdinalIgnoreCase) == true);
+        if (ours is not null)
+        {
+            Resources.MergedDictionaries.Remove(ours);
+            Resources.MergedDictionaries.Add(ours);
+        }
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
         DispatcherUnhandledException += OnUnhandled;
 

@@ -7,13 +7,13 @@ NightGuard warns you before bedtime, then powers your PC off (hibernate by defau
 > Built for heavy procrastinators. If you've ever googled "how to stop gaming at night" *while gaming at night*, hi, welcome, you're among friends.
 
 > [!WARNING]
-> **Use at your own risk.** NightGuard shuts down, hibernates, locks and blocks things on your PC on purpose. It's provided as is, with no warranty of any kind, and the author accepts no responsibility for lost work, lost game progress, damaged data, a PC that won't behave, or anything else that happens from using it. Save your work, try the [one-night trial](#-not-sure-yet-test-drive-it-first) first, and keep an administrator account you can always [fall back on](#-removing-it-by-hand-last-resort).
+> **Use at your own risk.** NightGuard shuts down, hibernates, locks and blocks things on your PC on purpose. It's provided as is, with no warranty of any kind, and the author accepts no responsibility for lost work, lost game progress, damaged data, a PC that won't behave, or anything else that happens from using it. Save your work, try the [previews](#-not-sure-yet-test-drive-it-first) first, and keep an administrator account you can always [fall back on](#-removing-it-by-hand-last-resort).
 
 ---
 
 ## ✨ What it does
 
-- ⏰ **Warns you** before bedtime (30 and 5 minutes by default). Popups, sound, custom messages, the works.
+- ⏰ **Warns you** before bedtime: a heads-up, a wrap-up and a final call (30, 10 and 5 minutes by default). Switch them on or off, pick the timing, add your own words if you like. No codes to type.
 - 🔌 **Enforces bedtime.** Shutdown, sleep, hibernate, lock or sign out, with a short countdown so you can save.
 - 🔁 **Doesn't fall for tricks.** Turn the PC back on during the night? It checks every minute, at every startup and every time the PC wakes up. Cancel the shutdown with `shutdown /a`? It shuts down anyway. Close the countdown window? It locks anyway. "Move" to Hawaii in the time zone settings at 11:59 PM? Nice try: NightGuard keeps its own clock.
 - 🔒 **No easy take-backs.** Once installed, you can make it stricter anytime, but loosening it or uninstalling needs a 7-day cool-off. The decision gets made with a clear head, not at 1 AM.
@@ -25,7 +25,8 @@ NightGuard warns you before bedtime, then powers your PC off (hibernate by defau
 - ☀️ **Morning check-in.** A little cheer for last night, your streak of clean nights, badges from night 1 to a full year, and an optional mood + note for your private journal. Recovery is a streak game.
 - 💬 **Your why.** Write down why you started. NightGuard throws it back at you in the final warning, right when you need it.
 - 🎯 **Gets through to you mid-game.** Warnings and the countdown force themselves on top, with a sound and a Windows notification as backup.
-- 🏁 **End date** (optional). Do a 30-day challenge and NightGuard removes itself afterwards. Like a gym membership, but it actually ends.
+- 🎯 **A promise you sign.** Commit to 7, 30 or 66 nights (or forever), and hold the button for three seconds to sign it. Hit the finish line and you get confetti and a "commit again?". It's a goal, not a lock.
+- 🦉 **Meet Hoot.** A night-owl mascot, a retro night-sky look, and a layout that fits any window size and display scaling. No more squinting at a wall of text boxes.
 
 ---
 
@@ -34,8 +35,8 @@ NightGuard warns you before bedtime, then powers your PC off (hibernate by defau
 1. **Download** [NightGuard.msi](https://github.com/Omidz/NightGuard/releases/latest/download/NightGuard.msi) from the [latest release](https://github.com/Omidz/NightGuard/releases/latest).
 2. **Double-click it** and follow the installer (accept the license, click Install, then Yes on the admin prompt). Blue "Windows protected your PC" screen? Click More info > Run anyway (more in the SmartScreen section just below).
 3. **NightGuard opens by itself** when the installer finishes. If it doesn't, open it from the Start Menu.
-4. **Walk through the setup.** Pick your bedtimes, warnings and what happens at bedtime. The defaults are sensible, so Next, Next, Next is totally fine. One thing we *strongly* recommend: write your why on the "Your why and journal" step.
-5. **Start it.** On the last step, read the summary, tick "Yes, these settings are correct", and click "Start NightGuard". Done! Go brush your teeth.
+4. **Walk through the setup.** Pick your bedtimes, warnings and what happens at bedtime. The defaults are sensible, so Next, Next, Next is totally fine. The first step is the important one: write your why, your plan for the final call, and sign your commitment. It takes a minute, and it's the part that makes the rest work.
+5. **Start it.** On the last step, look over your night plan, flip "Yes, this is my plan. Let's do this!", and click "Start NightGuard". Enjoy the confetti. Then go brush your teeth.
 
 **What got installed:** the NightGuard app in `C:\Program Files\NightGuard`, and a small Windows service that does the guarding. The service starts with Windows, before anyone signs in, and restarts itself if anything stops it. Closing the NightGuard window (or the tray icon) doesn't stop anything. Want it on the taskbar? Right-click NightGuard in the Start Menu > Pin to taskbar.
 
@@ -45,7 +46,7 @@ Needs 64-bit Windows 10 or 11. Nothing else to install: the installer brings eve
 
 ### 🌙 What happens tonight
 
-- **30 and 5 minutes before bedtime:** a popup (with a sound) jumps in front of whatever you're doing and tells you to wrap up and save. The last one reminds you why you started.
+- **30, 10 and 5 minutes before bedtime:** a popup (with a sound) jumps in front of whatever you're doing and tells you to wrap up and save. The final call reminds you of your why and your plan.
 - **At bedtime:** a full-screen 60-second countdown (even over your game; shrink it to save first), then the PC hibernates. Your open stuff is saved to disk, usually.
 - **Switch it back on before unlock time?** About a minute later: countdown, hibernate. Repeat until you give up and sleep. 😴
 - **After unlock time:** your PC is back to normal, and your apps are where you left them. Waking it from last night's hibernate won't set off a leftover countdown: anything NightGuard started before the PC went to sleep is cancelled on wake-up, and it double-checks the clock before it ever acts.
@@ -53,8 +54,8 @@ Needs 64-bit Windows 10 or 11. Nothing else to install: the installer brings eve
 
 ### 🧪 Not sure yet? Test drive it first
 
-- **During the day, nothing to commit to:** on the Warnings step, click "Preview" on a popup, and "Preview the bedtime countdown". That's exactly what you'll see at night.
-- **One-night trial:** on the At bedtime step, tick "Stop after this last locked night" and pick *today*. NightGuard guards tonight only, then removes itself in the morning. Liked it? Install it again for real.
+- **During the day, nothing to commit to:** on the Warnings step, click "Preview" on any warning card. That's exactly what you'll see at night.
+- **Peek at the countdown:** on the Warnings step, "Preview the countdown" shows the full-screen bedtime countdown, Hoot in his nightcap included. Press Esc to close it.
 
 Because of the [7-day cool-off](#-no-easy-take-backs-the-self-lock), choose your settings with care. Stricter is always easy, looser takes a week.
 
@@ -72,39 +73,32 @@ Once it's installed, Windows won't ask again.
 
 ## 🎛️ Settings
 
-NightGuard opens as a step-by-step wizard. Use Next and Back, or jump to any step in the list on the left. Nothing changes until the last step, Review and save: read the summary, tick "Yes, these settings are correct", and the "Start NightGuard" button appears (it says Save and apply once NightGuard is running). To change something later, open NightGuard again (Start Menu, or double-click the moon in the tray) and go straight to that step. Stricter changes save right away; looser ones need the [7-day cool-off](#-no-easy-take-backs-the-self-lock). The review page lists anything that counts as looser before you save.
+NightGuard opens as a step-by-step wizard. Use Next and Back, or jump to any step in the list on the left. Nothing changes until the last step, Review: your whole night plan as picture cards, each with an Edit link. Flip "Yes, this is my plan" and the "Start NightGuard" button appears (it says Save and apply once NightGuard is running). To change something later, open NightGuard again (Start Menu, or double-click the moon in the tray) and go straight to that step. Stricter changes save right away; looser ones need the [7-day cool-off](#-no-easy-take-backs-the-self-lock). The review page lists anything that counts as looser before you save.
 
-Sections you switch off (like screen time or blocking) are greyed out, so you can see at a glance what's on. "My journal", "Status and log" and "Request uninstall" live at the bottom left, out of the wizard's way.
+Once NightGuard is running, it opens to a home screen instead: tonight's bedtime, your streak, your commitment ring and your why. Sections you switch off (like screen time or blocking) are greyed out, so you can see at a glance what's on. On a small window the sidebar shrinks to icons. "My journal", "Status and log" and "Request uninstall" live at the bottom left, out of the wizard's way.
 
 **Changing settings needs an administrator account.** On a standard account you can look around and preview everything; NightGuard shows an "Open as administrator" button for saving. Tip: use a standard account day to day and let someone you trust keep the admin password.
 
-Times are shown the same way as your Windows clock: 12-hour with AM/PM, or 24-hour. Each time box is labelled with the format it uses. Click the hour or minute and use the arrows, or just type.
+Times are shown the same way as your Windows clock: 12-hour with AM/PM, or 24-hour. Pick the hour and minute from the drop-downs.
 
 | Step | What you can set | Default |
 |---|---|---|
-| **Bedtimes** | Bedtime and unlock time for each night. Untick nights to leave them free. Use the "Set several nights at once" box to give every night, school nights or weekend nights the same times in one click. Each row shows which hours get locked. | Every night, 00:00 to 06:00 |
-| **Warnings** | Up to 6 popups: how many minutes before, the message, sound on or off. Preview any popup, or the bedtime countdown, right there. | 30 and 5 minutes before |
-| **At bedtime** | Hibernate, Shutdown, Sleep, Lock or Sign out. Countdown length, how often it repeats, night mode length, end date. | Hibernate, 60 s countdown, repeats every minute |
-| **Your why and journal** | Your reason, in your words (highly recommended). Morning check-in, streaks and badges on or off. | Check-in on |
+| **Your why** | The 60-second ritual: your why, your if-then plan for the final call, the morning check-in, and your commitment (7, 30 or 66 nights, your own number, or forever), signed by holding a button for three seconds. | Check-in on, no commitment yet |
+| **Bedtimes** | Bedtime and unlock time for each night, with a little timeline per night. Switch nights off to leave them free. Quick set gives every night, Sun to Thu, or Fri and Sat the same times in one click. | Every night, 00:00 to 06:00 |
+| **Warnings** | Three cards: heads-up (20 to 60 minutes before), wrap-up (10 or 15) and final call (1 to 5). Each one: on or off, when, sound, and optional words of your own. Preview any of them, or the countdown. | All three: 30, 10 and 5 minutes before |
+| **At bedtime** | Pick a card: Hibernate, Shut down, Sleep, Sign out or Lock. Countdown length. Under More options: how often it repeats, and night mode. | Hibernate, 1 min countdown, repeats every minute |
 | **Game and screen time** | Daily game and screen time budgets (weekdays and weekends), warnings, what happens when time runs out, which programs count as games | Off (1 h games / 4 h screen on weekdays, 2 h / 6 h at weekends when you turn it on) |
 | **Block sites and apps** | Websites, apps or whole folders to block, and when | Off (a social media list is ready to go) |
 | **Trusted person** | Turn on the code lock. Your trusted person types their own code when you save. | Off |
-| **Review and save** | Check everything (including what counts as looser than now), desktop shortcut, confirm, save. | Start Menu shortcut |
+| **Review** | Your night plan as picture cards (plus anything that counts as looser than now), desktop shortcut, confirm, start. | Start Menu shortcut |
 
 **How nights are named:** after the evening they start. A bedtime before 12:00 counts as *after midnight*, so "Mon 00:30" means 12:30 AM, early Tuesday.
 
 **Time zones:** your bedtimes follow the time zone the PC had when you last saved. Switching the PC's time zone at 11 PM doesn't move bedtime. Travelling? Save your settings again in the new time zone (moving west counts as looser).
 
-### ✍️ Writing popups that actually work on you
+### ✍️ Your own words on a warning
 
-These fill themselves in: `{minutes}` (minutes left), `{bedtime}`, `{unlock}` and `{action}` (like "hibernate"). Type `\n` for a new line.
-
-- Keep it short: one line of news, one line of what to do.
-- Start kind, get firmer. Future you responds better to a plan than a lecture.
-- 30 minutes before: `Heads up! Bedtime in {minutes} minutes.\nWrap up this round.`
-- 5 minutes before: `FINAL WARNING!\nThe PC will {action} at {bedtime}. Save NOW.`
-
-Click "Fill in example messages" on the Warnings step to start from these, and "Preview" to see exactly how each popup looks.
+Each warning card comes with a message that already says what's happening and when, so there are no codes to type. Want it to hit harder? Add a line of your own under "Your own words", like "Ranked can wait. Sleep can't." It shows up right below NightGuard's message. Keep it short and kind-but-firm: future you responds better to a plan than a lecture.
 
 ### Which bedtime action?
 
@@ -129,21 +123,33 @@ On your first sign-in each day, NightGuard pops up with:
 
 - **A verdict on last night.** Off before bedtime? Applause. NightGuard had to step in? A gentle roast and a fresh start. Free night? Hope it was fun.
 - **Your streak:** clean nights in a row. A *clean night* means you were off before bedtime and stayed off, so the bouncer never had to step in. Free nights don't break the streak.
-- **An optional mood (1 to 5) and a short note**, saved to your journal. Or click Skip. No guilt trips. Well, small ones. Travel-size.
+- **An optional mood (1 to 5) and three good things from yesterday**, saved to your journal. Or click Skip. No guilt trips. Well, small ones. Travel-size.
 
 ### 🏅 Badges
 
 Clean nights in a row earn badges, all the way to a year: First Light (1), Hat Trick (3), High Five (5), Week Warrior (7), Double Digits (10), Fortnight Knight (14), Habit Hacker (21), Moonwalker (30), Sandman's Apprentice (45), Dream Team (60), Pillow Pro (75), Quarter Master (90), Night Owl, Retired (120), Sleep Scholar (150), Half-Year Hero (180), Snooze Sage (225), Nine-Month Ninja (270), Three Hundred Club (300), Almost There (330) and the big one, Sleep Legend (365). The morning check-in announces each new one.
 
-### 💬 Your why
+### 💬 Your why (the 60-second ritual)
 
-On the "Your why and journal" step, write one or two sentences about why you're doing this. Optional, but highly recommended: at 11:55 PM mid-game, "be healthier" is easy to ignore, while "I want to stop being a zombie at work" hits different. It shows up in the final warning, the bedtime countdown, your morning check-in and your journal. Change it any time (no cool-off needed).
+The first step of the setup, under a night sky, with a calm serif font and Hoot keeping you company. Three short prompts, each backed by research:
+
+1. **Your why.** One sentence about what you'll gain, in your own words. Goals tied to your own values are the ones people stick with. "Be healthier" is easy to ignore at 11:55 PM; "I want energy for my mornings, not just my matches" hits different.
+2. **Your plan.** Finish the line "When the final call pops up, I will...". If-then plans like this make people much more likely to follow through (a review of 94 studies, Gollwitzer and Sheeran, 2006). Small and physical works best: "save, say gg, and stand up."
+3. **Each morning.** Two minutes in the check-in: how you feel, and three good things from yesterday, an exercise shown to lift mood for months (Seligman and colleagues, 2005).
+
+Your why shows up on the home screen, in the final call, on the bedtime countdown, in the morning check-in and on the cover of your journal. Your plan shows up in the final call too. Change either any time (no cool-off needed).
+
+### 🎯 Your commitment
+
+Below the ritual: "I commit to..." 7 nights, 30 nights, 66 nights (the average time a new habit takes to stick, Lally and colleagues, 2010), a number of your own, or the big shiny Forever card. Press and hold "Hold to sign" for three seconds. Confetti. You're in.
+
+It's a promise to yourself, not a lock: it doesn't change what NightGuard enforces or when you can uninstall. The home screen and the morning check-in show how far along you are ("Night 12 of 30"). When you reach the end, there's a party and a "Commit again" button that takes you straight back to pick your next goal.
 
 ### 📓 My journal
 
 Read it all back under "My journal" (bottom left in the app): your why, your streak, badges earned and what's next, your entries and your average mood lately. "Save a copy..." exports it to a text file.
 
-Privacy: the journal stays on this PC, in a folder that only your Windows account (and the PC's administrators) can read. Nothing leaves the computer. It's deleted when NightGuard is uninstalled, so save a copy first if you want to keep it. Don't want the check-in? Untick Morning check-in on the At bedtime step (no cool-off needed for that one).
+Privacy: the journal stays on this PC, in a folder that only your Windows account (and the PC's administrators) can read. Nothing leaves the computer. It's deleted when NightGuard is uninstalled, so save a copy first if you want to keep it. Don't want the check-in? Switch off Morning check-in on the Your why step (no cool-off needed for that one).
 
 ## 🎮 Screen time limits
 
@@ -162,7 +168,7 @@ Turn them on in the Game and screen time step.
 - **Looser changes need an unlock:** later bedtime, fewer nights, removing blocks, more game time, a weaker action, a longer countdown. NightGuard lists what's looser and offers to request an unlock.
 - **The unlock has a 7-day cool-off.** After it, you have 3 days to make looser changes or uninstall, once. Then it locks again. You can cancel a request anytime.
 - **Uninstall** works the same way: "Request uninstall" (bottom left) starts the cool-off. When it's over, you get one last ARE YOU SURE?
-- **Set an end date?** Then there's no uninstall before it, and the date can't be moved earlier. NightGuard removes itself after the last night, as promised.
+- **End date from an earlier version?** It still works: there's no uninstall before it, the date can't be moved earlier, and NightGuard removes itself after the last night. New setups don't set end dates any more.
 - **Trusted-person mode on?** Your trusted person's code skips the cool-off (for changes and uninstall).
 - **Night mode** still applies: during the last hour before bedtime and through the night, nothing can be changed at all.
 
@@ -198,7 +204,7 @@ Too-easy codes like `12345678`, `00000000`, `12121212` or a birthday are refused
 Things that still work without the code, so you're never truly stuck:
 
 - The PC always works normally outside bedtime hours.
-- If you set an end date, NightGuard still removes itself after it.
+- If an earlier version set an end date, NightGuard still removes itself after it.
 - Without the code, you can still request an unlock and wait out the 7-day cool-off (unless there's an end date).
 - A Windows administrator can remove NightGuard by hand (see [Removing it by hand](#-removing-it-by-hand-last-resort)). For a real lock, use a standard (non-admin) Windows account day to day, and let your trusted person keep the admin password too.
 
@@ -261,7 +267,7 @@ If it's during locked hours, boot into Safe Mode first (hold Shift while clickin
 
 ## 🧪 Try it before you trust it
 
-Do the [test drive](#-not-sure-yet-test-drive-it-first) first: previews during the day, then a one-night trial with the end date set to today. It removes itself in the morning, and you install it for real with your settings dialled in.
+Do the [test drive](#-not-sure-yet-test-drive-it-first) first: preview every warning and the countdown during the day, before you start it for real.
 
 Something weird? [Open an issue](../../issues). Bug reports from fellow procrastinators are very welcome (ideally filed before midnight 😉).
 

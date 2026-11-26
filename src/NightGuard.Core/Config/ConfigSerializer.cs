@@ -58,6 +58,9 @@ public static class ConfigSerializer
         cfg.Action = (cfg.Action ?? "").Trim();
         cfg.EndDate = string.IsNullOrWhiteSpace(cfg.EndDate) ? null : cfg.EndDate.Trim();
         cfg.Why = (cfg.Why ?? "").Trim();
+        cfg.Plan = (cfg.Plan ?? "").Trim();
+        cfg.CommitStart = string.IsNullOrWhiteSpace(cfg.CommitStart) ? null : cfg.CommitStart.Trim();
+        if (cfg.CommitNights is null) cfg.CommitStart = null;
         cfg.TimeZone = string.IsNullOrWhiteSpace(cfg.TimeZone) ? null : cfg.TimeZone.Trim();
 
         var b = cfg.Blocking ??= new BlockingSettings();

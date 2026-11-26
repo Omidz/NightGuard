@@ -15,9 +15,11 @@ public partial class CheckInWindow : Window
     private static readonly Random Rng = new();
     private int _mood;
     private readonly Badge? _badge;
+    private readonly Action? _commitAgain;
 
-    public CheckInWindow(CheckInInfo info)
+    public CheckInWindow(CheckInInfo info, Action? commitAgain = null)
     {
+        _commitAgain = commitAgain;
         InitializeComponent();
         static string Pick(params string[] items) => items[Rng.Next(items.Length)];
         string title, body;
@@ -54,17 +56,31 @@ public partial class CheckInWindow : Window
             title = "You earned a badge!";
             body = _badge.Line + "\n" + body;
             BadgeCard.Visibility = Visibility.Visible;
-            BadgeCard.Background = Art.NightSky();
             BadgeName.Text = _badge.Name;
         }
         Header.Background = info.Kind == "SteppedIn" ? Art.NightSky() : Art.Sunrise();
-        HeaderEmoji.Text = _badge is not null ? "\U0001F3C6" : info.Kind switch { "Clean" => "\u2600\uFE0F", "SteppedIn" => "\U0001F917", _ => "\U0001F305" };
+        Hoot.Mood = info.Kind == "SteppedIn" ? OwlMood.Sleepy : OwlMood.Happy;
+
+        // Where you are in the nights you committed to
+        var p = Commitment.Progress(info.CommitNights, info.CommitStart, DateTime.Today);
+        CommitCard.Visibility = p is null ? Visibility.Collapsed : Visibility.Visible;
+        if (p is not null)
+        {
+            CommitRing.Fraction = p.Forever ? 1 : (double)p.NightsPassed / p.Total;
+            CommitText.Text = p.Forever ? $"Night {p.Night} of forever \u221E" : p.Done ? $"{p.Total} of {p.Total} nights! \U0001F389" : $"Night {p.Night} of {p.Total}";
+        }
+        if (p is { Done: true })
+        {
+            CommitDone.Visibility = Visibility.Visible;
+            CommitDoneText.Text = $"You kept your {p.Total}-night promise. That's huge. Go again?";
+            Loaded += (_, _) => Dispatcher.BeginInvoke(() => Confetti.Burst((Panel)Content), DispatcherPriority.ApplicationIdle);
+        }
         if (Badges.Next(Math.Max(info.Best, info.Streak)) is { } next) streak += $"  Next badge: {next.Name} at {next.Nights}.";
 
         TitleText.Text = title;
         Body.Text = body;
         StreakText.Text = streak;
-        WhyText.Text = string.IsNullOrWhiteSpace(info.Why) ? "" : $"Remember why you started: “{info.Why}”";
+        WhyText.Text = string.IsNullOrWhiteSpace(info.Why) ? "" : $"“{info.Why}”";
         WhyText.Visibility = string.IsNullOrWhiteSpace(info.Why) ? Visibility.Collapsed : Visibility.Visible;
 
         string[] faces = ["\U0001F62B", "\U0001F615", "\U0001F610", "\U0001F642", "\U0001F601"];
@@ -92,8 +108,10 @@ public partial class CheckInWindow : Window
         public MoodButton(string face, string name, int mood)
         {
             Tag = mood;
+            SetResourceReference(StyleProperty, "Pill");
             Margin = new Thickness(0, 0, 8, 0);
-            Padding = new Thickness(4, 6, 4, 6);
+            Padding = new Thickness(4, 8, 4, 8);
+            MinWidth = 0;
             HorizontalAlignment = HorizontalAlignment.Stretch;
             HorizontalContentAlignment = HorizontalAlignment.Center;
             var sp = new StackPanel();
@@ -101,6 +119,12 @@ public partial class CheckInWindow : Window
             sp.Children.Add(new TextBlock { Text = name, HorizontalAlignment = HorizontalAlignment.Center });
             Content = sp;
         }
+    }
+
+    private void CommitAgain_Click(object sender, RoutedEventArgs e)
+    {
+        _commitAgain?.Invoke();
+        Close();
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e)

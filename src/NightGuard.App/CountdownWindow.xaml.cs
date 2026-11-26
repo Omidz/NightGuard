@@ -48,6 +48,7 @@ public partial class CountdownWindow : Window
             Fill = new RadialGradientBrush(Color.FromArgb(0x55, 0xFF, 0xD6, 0x66), Color.FromArgb(0, 0xFF, 0xD6, 0x66)),
         });
         MoonHolder.Children.Add(Art.Crescent(100, Art.Moon));
+        MoonHolder.Children.Add(new Owl { Mood = OwlMood.Sleepy, Width = 96, Height = 104, Margin = new Thickness(-150, 20, 0, 0), HorizontalAlignment = HorizontalAlignment.Left });
         var zzz = Art.Zzz(26);
         zzz.Margin = new Thickness(108, -10, 0, 0);
         zzz.HorizontalAlignment = HorizontalAlignment.Left;

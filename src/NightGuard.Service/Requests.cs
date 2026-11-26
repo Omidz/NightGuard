@@ -105,6 +105,9 @@ internal sealed partial class Engine
         s.ScreenTimeEnabled = cfg.ScreenTime.Enabled;
         s.UsageText = ScreenTimeEngine.UsageText(cfg.ScreenTime, _usage ?? _store.ReadUsage(), now);
         s.Why = cfg.Why;
+        s.Plan = cfg.Plan;
+        s.CommitNights = cfg.CommitNights;
+        s.CommitStart = cfg.CommitStart;
         if (Streaks.Report(cfg, now, _store.ReadSince(), _store.ReadSteppedIn()) is { } rep)
         {
             s.Streak = rep.Streak;
@@ -286,7 +289,7 @@ internal sealed partial class Engine
         return new IpcResponse
         {
             Ok = true,
-            CheckIn = new CheckInInfo { Show = true, Kind = rep.Kind.ToString(), Streak = rep.Streak, Best = rep.Best, Why = cfg.Why },
+            CheckIn = new CheckInInfo { Show = true, Kind = rep.Kind.ToString(), Streak = rep.Streak, Best = rep.Best, Why = cfg.Why, Plan = cfg.Plan, CommitNights = cfg.CommitNights, CommitStart = cfg.CommitStart },
         };
     }
 

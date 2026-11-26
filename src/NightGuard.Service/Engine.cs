@@ -293,6 +293,8 @@ internal sealed partial class Engine
             var text = ScheduleMath.FormatMessage(w.Message, cfg, night, minutes, "t");
             if (w.MinutesBefore == finalMinutes && !string.IsNullOrWhiteSpace(cfg.Why))
                 text += $"\n\nRemember why you started:\n“{cfg.Why}”";
+            if (w.MinutesBefore == finalMinutes && !string.IsNullOrWhiteSpace(cfg.Plan))
+                text += $"\n\nYour plan: {cfg.Plan}";
             var urgent = w.MinutesBefore <= 5;
             _store.Log($"warning: {w.MinutesBefore} min before bedtime");
             _ = _agents.SendWithFallbackAsync(new AgentEvent

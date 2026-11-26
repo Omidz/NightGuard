@@ -1,166 +1,446 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using NightGuard.Core.Blocking;
 using NightGuard.Core.Config;
 using NightGuard.Core.Ipc;
+using NightGuard.Core.Journal;
 using NightGuard.Core.Schedule;
 
 namespace NightGuard.App;
 
 /// <summary>
-/// The NightGuard window: a step-by-step wizard (steps on the left, one page at a time, Back / Next).
-/// Nothing changes until the last page. Every save goes to the service, which checks night mode,
-/// the self-lock and the trusted person's code itself.
+/// The NightGuard window: home (once it's running) and a step-by-step setup (steps on the left,
+/// one page at a time, Back / Next). Nothing changes until the last page. Every save goes to the
+/// service, which checks night mode, the self-lock and the trusted person's code itself.
 /// </summary>
 public partial class MainWindow : Window
 {
-    private sealed record NightRow(CheckBox On, TimePicker Bed, TimePicker Unlock, TextBlock Note);
-    private sealed record WarnRow(CheckBox On, IntBox Minutes, CheckBox Sound, TextBox Message, Button Preview);
-    private sealed record SlotRow(CheckBox On, CheckBox[] Days, TimePicker From, TimePicker To);
+    private sealed record NightCard(CheckBox On, TimePicker Bed, TimePicker Unlock, TextBlock Note, ColumnDefinition Before, ColumnDefinition Locked, ColumnDefinition After, Border Fill);
+    private sealed record WarnCard(Defaults.WarningPreset Preset, CheckBox On, PillPicker Minutes, CheckBox Sound, TextBox Custom, Button Preview, StackPanel Body);
+    private sealed record SlotCard(CheckBox On, ToggleButton[] Days, TimePicker From, TimePicker To, StackPanel Body);
 
-    private readonly List<NightRow> _nights = [];
-    private readonly List<WarnRow> _warns = [];
-    private readonly List<SlotRow> _slots = [];
+    private readonly List<NightCard> _nights = [];
+    private readonly List<WarnCard> _warns = [];
+    private readonly List<SlotCard> _slots = [];
+    private readonly Dictionary<string, ToggleButton> _actionCards = [];
+    private readonly List<ToggleButton> _commitCards = [];
+    private readonly ToggleButton _customCommitCard = new();
+    private readonly IntBox _commitCustom = new() { Min = 1, Max = 3650, Step = 1, Suffix = "nights" };
     private readonly FrameworkElement[] _pages;
     private StatusInfo? _status;
     private string? _serviceError;
     private bool _loading = true;
     private bool _busy;
+    private bool _celebratedDone;
 
-    private static readonly Dictionary<string, string> ActionDescriptions = new()
+    // The commitment: what's picked on the Your why page, whether it's signed, and what was saved before
+    private int? _commitChoice;
+    private bool _signed;
+    private bool _recommit;
+    private int? _savedCommit;
+    private string? _savedCommitStart;
+    private string? _savedEndDate;
+
+    private static readonly string[] ActionOrder = ["Hibernate", "Shutdown", "Sleep", "SignOut", "Lock"];
+
+    private static readonly Dictionary<string, (string Emoji, string Name, int Strength, string Text)> ActionInfo = new()
     {
-        ["Shutdown"] = "Strongest. Closes everything; unsaved work is lost.",
-        ["Sleep"] = "Medium. Quick to resume, but it goes back to sleep every few minutes during the night.",
-        ["Hibernate"] = "Recommended. Saves your open apps to disk and powers off, so they are usually still there in the morning (not guaranteed, so save anyway). If hibernate is off in Windows, NightGuard offers to turn it on when you save.",
-        ["Lock"] = "Weakest. Locks the screen, again every few minutes, but you can keep signing back in.",
-        ["SignOut"] = "Medium. Closes all your apps and signs you out, again if you sign back in.",
+        ["Hibernate"] = ("🌙", "Hibernate", 3, "Saves your open apps and powers off. They're usually still there in the morning (save anyway). If hibernate is off in Windows, NightGuard offers to turn it on."),
+        ["Shutdown"] = ("🔌", "Shut down", 3, "Closes everything. Unsaved work is lost."),
+        ["Sleep"] = ("💤", "Sleep", 2, "Quick to resume, so it goes back to sleep every few minutes all night."),
+        ["SignOut"] = ("🚪", "Sign out", 2, "Closes your apps and signs you out, again if you sign back in."),
+        ["Lock"] = ("🔒", "Lock", 1, "Locks the screen every few minutes. You can keep signing back in."),
     };
 
-    // A little encouragement in the corner, one per page
-    private static readonly string[] Tips =
+    private static readonly string[] WhyExamples =
     [
-        "Sleep isn't lost gaming time. It's how you get better at the game. \U0001F9E0",
-        "Most people need 7 to 9 hours. Your K/D ratio needs them too.",
-        "Screens off 30 minutes before bed helps you fall asleep faster. \U0001F4F5",
-        "Hibernate keeps your apps where you left them. Shutdown keeps nothing. Choose wisely.",
-        "\"Why\" beats willpower. Write yours down: it really helps.",
-        "A budget isn't a punishment. It's a plan. \U0001F4C5",
-        "Blocking the 1 AM rabbit holes is easier than resisting them.",
-        "Someone you trust holding the key? That's not weakness, that's strategy. \U0001F91D",
-        "Stricter is instant, looser takes a week. Past-you made a deal. \U0001F91D",
+        "I want to wake up without hating my alarm.",
+        "I want energy for my mornings, not just my matches.",
+        "My grades are worth more than my rank.",
+        "I'm tired of being tired.",
+        "3 AM me makes bad decisions.",
+    ];
+
+    private static readonly string[] PlanExamples =
+    [
+        "save, say gg, and stand up.",
+        "plug my phone in across the room.",
+        "brush my teeth right away.",
+        "write tomorrow's first task down, then lights off.",
     ];
 
     public MainWindow()
     {
         InitializeComponent();
-        _pages = [PageWelcome, PageBedtimes, PageWarnings, PageAction, PageWhy, PageScreen, PageBlock, PageTrusted, PageReview];
+        var wa = SystemParameters.WorkArea;
+        Width = Math.Max(MinWidth, Math.Min(1180, wa.Width * 0.92));
+        Height = Math.Max(MinHeight, Math.Min(840, wa.Height * 0.92));
+
+        _pages = [PageWelcome, PageWhy, PageBedtimes, PageWarnings, PageAction, PageScreen, PageBlock, PageTrusted, PageReview];
+        var heads = new[] { HeadBedtimes, HeadWarnings, HeadAction, HeadScreen, HeadBlock, HeadTrusted, HeadReview };
+        for (var i = 0; i < heads.Length; i++) heads[i].Step = $"Step {i + 2} of 8";
+        WhyStep.Text = "STEP 1 OF 8  ·  YOUR WHY";
         TimeHintText.Text = TimeText.Hint;
-        foreach (var a in Defaults.Actions) ActionBox.Items.Add(a);
-        foreach (var a in Defaults.ScreenActions) LimitAction.Items.Add(a);
         QuickBed.Value = "23:00";
         QuickUnlock.Value = "06:00";
-        BuildNightRows();
-        BuildWarningRows();
-        BuildSlotRows();
+
+        BuildHowItWorks();
+        BuildRitual();
+        BuildCommitCards();
+        BuildNightCards();
+        BuildWarningCards();
+        BuildActionCards();
+        BuildSlotCards();
+        CountdownPills.SetChoices([(30, "30 s"), (60, "1 min"), (120, "2 min"), (300, "5 min")], Seconds);
+        RecheckPills.SetChoices([(1, "1 min"), (2, "2 min"), (5, "5 min"), (10, "10 min"), (15, "15 min")], m => $"{m} min");
+        NightModePills.SetChoices([(0, "Off"), (30, "30 min"), (60, "1 hour"), (120, "2 hours"), (240, "4 hours")], Minutes);
+        LimitPills.SetChoices([(0, "🔒  Lock"), (1, "🔌  Shut down"), (2, "💬  Just warn")], i => Defaults.ScreenActions[i]);
+        WarnAtPills.SetChoices([(30, "30 min"), (15, "15 min"), (10, "10 min"), (5, "5 min"), (1, "1 min")]);
 
         // Any change on any page: re-check the settings and update what depends on what
-        Pages.AddHandler(TextBoxBase.TextChangedEvent, new TextChangedEventHandler((_, _) => OnFormChanged()));
+        Pages.AddHandler(System.Windows.Controls.Primitives.TextBoxBase.TextChangedEvent, new TextChangedEventHandler((_, _) => OnFormChanged()));
         Pages.AddHandler(ToggleButton.CheckedEvent, new RoutedEventHandler((_, _) => OnFormChanged()));
         Pages.AddHandler(ToggleButton.UncheckedEvent, new RoutedEventHandler((_, _) => OnFormChanged()));
         Pages.AddHandler(Selector.SelectionChangedEvent, new SelectionChangedEventHandler((_, _) => OnFormChanged()));
 
+        SignButton.Signed += (_, _) => OnSigned();
+        SizeChanged += (_, _) => UpdateCompact();
+        WhySky.Loaded += (_, _) => { if (WhySky.Children.Count == 0) Art.Stars(WhySky, 1800, 2400, 170, 7); };
         Steps.SelectedIndex = 0;
         Loaded += async (_, _) => await ReloadAsync();
     }
 
-    // ================================================================ building the repeating rows
-    private void BuildNightRows()
+    private static string Seconds(int s) => s < 60 ? $"{s} s" : s % 60 == 0 ? $"{s / 60} min" : $"{s / 60} min {s % 60} s";
+    private static string Minutes(int m) => m == 0 ? "Off" : m % 60 == 0 ? (m == 60 ? "1 hour" : $"{m / 60} hours") : $"{m} min";
+    private Brush Res(string key) => (Brush)FindResource(key);
+
+    private static TextBlock Text(string text, string style, double? size = null)
     {
-        NightsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
-        NightsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        NightsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        NightsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        AddHeaderRow(NightsGrid, "Night", "Bedtime", "Unlocks at", "");
+        var t = new TextBlock { Text = text };
+        t.SetResourceReference(StyleProperty, style);
+        if (size is { } s) t.FontSize = s;
+        return t;
+    }
+
+    private static Border Badge(string emoji, double size = 44)
+    {
+        var b = new Border { Width = size, Height = size, CornerRadius = new CornerRadius(size / 2), Child = Art.Emoji(emoji, size * 0.48, Brushes.White) };
+        b.SetResourceReference(StyleProperty, "IconBadge");
+        b.Width = b.Height = size;
+        b.CornerRadius = new CornerRadius(size / 2);
+        return b;
+    }
+
+    private static Border Card(UIElement child, double width, string style = "TileCard")
+    {
+        var b = new Border { Child = child };
+        b.SetResourceReference(StyleProperty, style);
+        if (width > 0) b.Width = width;
+        return b;
+    }
+
+    // ================================================================ narrow windows: icons-only sidebar
+    private void UpdateCompact()
+    {
+        var compact = ActualWidth < 1000;
+        SideColumn.Width = new GridLength(compact ? 78 : 252);
+        BrandText.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        foreach (var t in Labels(Root)) t.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private static IEnumerable<TextBlock> Labels(DependencyObject parent)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(parent).OfType<DependencyObject>())
+        {
+            if (child is TextBlock { Tag: "label" } t) yield return t;
+            if (child == null || child is ScrollViewer) continue;   // skip the pages
+            foreach (var x in Labels(child)) yield return x;
+        }
+    }
+
+    // ================================================================ building the pages
+    private void BuildHowItWorks()
+    {
+        (string Emoji, string Title, string Text)[] items =
+        [
+            ("💬", "Your why", "One sentence, one plan, and a promise you sign. This is the part that makes it stick."),
+            ("🛏️", "Your nights", "Pick bedtimes and when the PC unlocks in the morning."),
+            ("⏰", "Nudges, then lights out", "Friendly warnings, a countdown, then the PC hibernates. No arguing."),
+            ("✨", "Extras", "Game budgets, site blocking, and a trusted person who holds the key. All optional."),
+        ];
+        foreach (var (emoji, title, text) in items)
+        {
+            var sp = new StackPanel();
+            var head = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
+            var badge = Badge(emoji);
+            DockPanel.SetDock(badge, Dock.Left);
+            head.Children.Add(badge);
+            var h = Text(title, "H2");
+            h.VerticalAlignment = VerticalAlignment.Center;
+            h.Margin = new Thickness(0);
+            head.Children.Add(h);
+            sp.Children.Add(head);
+            sp.Children.Add(Text(text, "Hint"));
+            HowItWorks.Children.Add(Card(sp, 236));
+        }
+    }
+
+    private void BuildRitual()
+    {
+        (string N, string Title, string Text)[] steps =
+        [
+            ("1", "Your why", "One sentence about what you'll gain, in your own words. Not \"be healthier\". Something that hits."),
+            ("2", "Your plan", "Finish the line \"When the final call pops up, I will...\". Small, physical, doable at 11:55 PM."),
+            ("3", "Each morning", "Two minutes: how you feel, and three good things from yesterday. Read it back on the hard nights."),
+        ];
+        foreach (var (n, title, text) in steps)
+        {
+            var sp = new DockPanel { Width = 236, Margin = new Thickness(0, 0, 16, 12) };
+            var num = new Border
+            {
+                Width = 34, Height = 34, CornerRadius = new CornerRadius(17), Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Top,
+                Child = new TextBlock { Text = n, FontWeight = FontWeights.Bold, FontSize = 16, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = Res("NgOnMoon") },
+                Background = Res("NgMoon"),
+            };
+            DockPanel.SetDock(num, Dock.Left);
+            sp.Children.Add(num);
+            var body = new StackPanel();
+            body.Children.Add(new TextBlock { Text = title, FontFamily = (FontFamily)FindResource("NgSerif"), FontSize = 21, Foreground = Res("NgText") });
+            body.Children.Add(Text(text, "Hint"));
+            sp.Children.Add(body);
+            RitualSteps.Children.Add(sp);
+        }
+        foreach (var idea in WhyExamples) AddIdea(WhyIdeas, idea, WhyBox);
+        foreach (var idea in PlanExamples) AddIdea(PlanIdeas, idea, PlanBox);
+    }
+
+    private static void AddIdea(WrapPanel host, string idea, TextBox target)
+    {
+        var chip = new Button { Content = idea };
+        chip.SetResourceReference(StyleProperty, "Chip");
+        chip.Click += (_, _) => { target.Text = idea; target.Focus(); target.CaretIndex = target.Text.Length; };
+        host.Children.Add(chip);
+    }
+
+    private void BuildCommitCards()
+    {
+        (int Nights, string Caption)[] choices =
+        [
+            (Commitment.Choices[0], "A first week. Prove it to yourself."),
+            (Commitment.Choices[1], "A month. Long enough to feel it."),
+            (Commitment.Choices[2], "Habit-forming. 66 days is the average time a new habit takes to stick (Lally and colleagues, 2010)."),
+        ];
+        foreach (var (nights, caption) in choices)
+        {
+            var sp = new StackPanel();
+            sp.Children.Add(new TextBlock { Text = nights.ToString(CultureInfo.CurrentCulture), FontSize = 44, FontWeight = FontWeights.Bold, FontFamily = (FontFamily)FindResource("NgDisplay"), Foreground = Res("NgMoon") });
+            sp.Children.Add(new TextBlock { Text = "nights", FontSize = 17, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, -4, 0, 6) });
+            sp.Children.Add(Text(caption, "Hint"));
+            var card = new ToggleButton { Content = sp, Tag = nights, Width = 178 };
+            card.SetResourceReference(StyleProperty, "ChoiceCard");
+            card.Click += CommitChoice_Click;
+            _commitCards.Add(card);
+            CommitChoices.Children.Add(card);
+        }
+        var custom = new StackPanel();
+        custom.Children.Add(new TextBlock { Text = "Your number", FontSize = 17, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 6, 0, 12) });
+        _commitCustom.Value = 14;
+        custom.Children.Add(_commitCustom);
+        custom.Children.Add(Text("Anything from 1 night to 10 years.", "Hint"));
+        _customCommitCard.Content = custom;
+        _customCommitCard.Tag = -1;
+        _customCommitCard.Width = 216;
+        _customCommitCard.SetResourceReference(StyleProperty, "ChoiceCard");
+        _customCommitCard.Click += CommitChoice_Click;
+        _commitCustom.ValueChanged += (_, _) =>
+        {
+            // Only when someone is actually changing the number
+            if (_loading || !_commitCustom.IsKeyboardFocusWithin) return;
+            Choose(_commitCustom.Value, fromCustom: true);
+        };
+        CommitChoices.Children.Add(_customCommitCard);
+    }
+
+    private void BuildNightCards()
+    {
         for (var i = 0; i < 7; i++)
         {
-            var row = new NightRow(
-                new CheckBox { Content = Defaults.DayNames[i] + " night", VerticalAlignment = VerticalAlignment.Center, FontSize = 14 },
-                new TimePicker { Margin = new Thickness(0, 0, 18, 0) },
-                new TimePicker { Margin = new Thickness(0, 0, 18, 0) },
-                new TextBlock { VerticalAlignment = VerticalAlignment.Center, Opacity = 0.75, TextWrapping = TextWrapping.Wrap });
-            row.Bed.ValueChanged += (_, _) => OnFormChanged();
-            row.Unlock.ValueChanged += (_, _) => OnFormChanged();
-            AddRow(NightsGrid, row.On, row.Bed, row.Unlock, row.Note);
-            _nights.Add(row);
+            var on = new CheckBox { Content = Defaults.DayNames[i] + " night", FontWeight = FontWeights.SemiBold, FontSize = 15 };
+            on.SetResourceReference(StyleProperty, "ToggleSwitch");
+            var bed = new TimePicker();
+            var unlock = new TimePicker();
+            var note = Text("", "Hint");
+            var before = new ColumnDefinition();
+            var locked = new ColumnDefinition();
+            var after = new ColumnDefinition();
+            var bar = new Grid { Height = 10, Margin = new Thickness(0, 14, 0, 2) };
+            bar.ColumnDefinitions.Add(before);
+            bar.ColumnDefinitions.Add(locked);
+            bar.ColumnDefinitions.Add(after);
+            var track = new Border { CornerRadius = new CornerRadius(5), Background = Res("NgSurface2") };
+            Grid.SetColumnSpan(track, 3);
+            bar.Children.Add(track);
+            var fill = new Border { CornerRadius = new CornerRadius(5), Background = Res("NgMoon") };
+            Grid.SetColumn(fill, 1);
+            bar.Children.Add(fill);
+            var scale = new DockPanel();
+            var left = Text("6 PM", "Hint", 11);
+            DockPanel.SetDock(left, Dock.Left);
+            var right = Text("noon", "Hint", 11);
+            DockPanel.SetDock(right, Dock.Right);
+            scale.Children.Add(left);
+            scale.Children.Add(right);
+            scale.Children.Add(new TextBlock { Text = "midnight", FontSize = 11, Foreground = Res("NgMuted"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 0) });
+
+            var sp = new StackPanel();
+            sp.Children.Add(on);
+            sp.Children.Add(Text("Bedtime", "Hint"));
+            sp.Children[^1].SetValue(MarginProperty, new Thickness(0, 14, 0, 4));
+            sp.Children.Add(bed);
+            sp.Children.Add(Text("Unlocks at", "Hint"));
+            sp.Children[^1].SetValue(MarginProperty, new Thickness(0, 10, 0, 4));
+            sp.Children.Add(unlock);
+            sp.Children.Add(bar);
+            sp.Children.Add(scale);
+            sp.Children.Add(note);
+            bed.ValueChanged += (_, _) => OnFormChanged();
+            unlock.ValueChanged += (_, _) => OnFormChanged();
+            NightsPanel.Children.Add(Card(sp, 274));
+            _nights.Add(new NightCard(on, bed, unlock, note, before, locked, after, fill));
         }
     }
 
-    private void BuildWarningRows()
+    private void BuildWarningCards()
     {
-        foreach (var w in new[] { 60, 110, 70, 1, 90 }) WarningsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(w) });
-        WarningsGrid.ColumnDefinitions[3] = new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) };
-        AddHeaderRow(WarningsGrid, "On", "Minutes before", "Sound", "Message", "");
-        for (var i = 0; i < 6; i++)
+        foreach (var p in Defaults.WarningPresets)
         {
-            var row = new WarnRow(
-                new CheckBox { VerticalAlignment = VerticalAlignment.Center },
-                new IntBox { Min = 1, Max = 360, Width = 80 },
-                new CheckBox { VerticalAlignment = VerticalAlignment.Center, IsChecked = true },
-                new TextBox { Margin = new Thickness(0, 0, 10, 0), VerticalContentAlignment = VerticalAlignment.Center },
-                new Button { Content = "Preview", Padding = new Thickness(10, 5, 10, 5), Tag = i });
-            row.Preview.Click += PreviewWarning_Click;
-            AddRow(WarningsGrid, row.On, row.Minutes, row.Sound, row.Message, row.Preview);
-            _warns.Add(row);
+            var on = new CheckBox();
+            on.SetResourceReference(StyleProperty, "ToggleSwitch");
+            System.Windows.Automation.AutomationProperties.SetName(on, p.Name);
+            var head = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
+            DockPanel.SetDock(on, Dock.Right);
+            head.Children.Add(on);
+            var badge = Badge(p.Emoji);
+            DockPanel.SetDock(badge, Dock.Left);
+            head.Children.Add(badge);
+            var title = Text(p.Name, "H2");
+            title.VerticalAlignment = VerticalAlignment.Center;
+            title.Margin = new Thickness(0);
+            head.Children.Add(title);
+
+            var minutes = new PillPicker();
+            minutes.SetChoices(p.Minutes.Select(m => (m, $"{m} min")), m => $"{m} min");
+            minutes.Value = p.DefaultMinutes;
+            var sound = new CheckBox { Content = "With a sound", IsChecked = true };
+            sound.SetResourceReference(StyleProperty, "ToggleSwitch");
+            var custom = new TextBox { MaxLength = 200, TextWrapping = TextWrapping.Wrap, MinHeight = 56, AcceptsReturn = false };
+            var preview = new Button { Content = "👀  Preview", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 14, 0, 0) };
+            preview.SetResourceReference(StyleProperty, "ChunkyButton");
+            var body = new StackPanel();
+            body.Children.Add(Text("Pops up before bedtime", "Label"));
+            body.Children.Add(minutes);
+            body.Children.Add(sound);
+            sound.Margin = new Thickness(0, 6, 0, 0);
+            body.Children.Add(Text("Your own words (optional)", "Label"));
+            body.Children[^1].SetValue(MarginProperty, new Thickness(0, 16, 0, 6));
+            body.Children.Add(custom);
+            body.Children.Add(preview);
+
+            var sp = new StackPanel();
+            sp.Children.Add(head);
+            sp.Children.Add(Text(p.Blurb, "Hint"));
+            sp.Children[^1].SetValue(MarginProperty, new Thickness(0, 0, 0, 14));
+            sp.Children.Add(body);
+            var card = new WarnCard(p, on, minutes, sound, custom, preview, body);
+            preview.Click += (_, _) => PreviewWarning(card);
+            _warns.Add(card);
+            WarningsPanel.Children.Add(Card(sp, 360));
         }
     }
 
-    private void BuildSlotRows()
+    private void BuildActionCards()
     {
-        SlotsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
-        for (var d = 0; d < 7; d++) SlotsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(46) });
-        SlotsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        SlotsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        AddHeaderRow(SlotsGrid, ["On", .. Defaults.Days, "From", "To"]);
+        foreach (var a in ActionOrder)
+        {
+            var (emoji, name, strength, text) = ActionInfo[a];
+            var sp = new StackPanel();
+            var head = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 30, 8) };
+            head.Children.Add(Art.Emoji(emoji, 26, Brushes.White));
+            var nameText = Text(name, "H2");
+            nameText.Margin = new Thickness(10, 0, 0, 0);
+            nameText.VerticalAlignment = VerticalAlignment.Center;
+            head.Children.Add(nameText);
+            sp.Children.Add(head);
+            if (a == "Hibernate")
+            {
+                sp.Children.Add(new Border
+                {
+                    CornerRadius = new CornerRadius(8), Background = Res("NgMoon"), Padding = new Thickness(8, 2, 8, 2), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 8),
+                    Child = new TextBlock { Text = "RECOMMENDED", FontSize = 10.5, FontWeight = FontWeights.Bold, Foreground = Res("NgOnMoon") },
+                });
+            }
+            var dots = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+            dots.Children.Add(new TextBlock { Text = "Strength ", FontSize = 12, Foreground = Res("NgMuted"), VerticalAlignment = VerticalAlignment.Center });
+            for (var i = 0; i < 3; i++)
+                dots.Children.Add(new System.Windows.Shapes.Ellipse { Width = 10, Height = 10, Margin = new Thickness(3, 0, 0, 0), Fill = i < strength ? Res("NgMoon") : Res("NgSurface2") });
+            sp.Children.Add(dots);
+            sp.Children.Add(Text(text, "Hint"));
+            var card = new ToggleButton { Content = sp, Tag = a, Width = 236 };
+            card.SetResourceReference(StyleProperty, "ChoiceCard");
+            card.Click += (_, _) => SelectAction(a);
+            _actionCards[a] = card;
+            ActionsPanel.Children.Add(card);
+        }
+    }
+
+    private string _action = "Hibernate";
+
+    private void SelectAction(string a)
+    {
+        _action = Defaults.Actions.Contains(a) ? a : "Hibernate";
+        foreach (var (k, c) in _actionCards) c.IsChecked = k == _action;
+    }
+
+    private void BuildSlotCards()
+    {
         for (var i = 0; i < 4; i++)
         {
-            var days = Enumerable.Range(0, 7).Select(d => new CheckBox { IsChecked = d < 5, MinWidth = 0 }).ToArray();
-            var row = new SlotRow(new CheckBox { MinWidth = 0 }, days, new TimePicker { Margin = new Thickness(6, 0, 12, 0) }, new TimePicker());
-            row.From.Value = "09:00";
-            row.To.Value = "17:00";
-            row.From.ValueChanged += (_, _) => OnFormChanged();
-            row.To.ValueChanged += (_, _) => OnFormChanged();
-            AddRow(SlotsGrid, [row.On, .. days, row.From, row.To]);
-            _slots.Add(row);
-        }
-    }
-
-    private static void AddHeaderRow(Grid g, params string[] headers)
-    {
-        g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        for (var c = 0; c < headers.Length; c++)
-        {
-            var t = new TextBlock { Text = headers[c], FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 6) };
-            Grid.SetColumn(t, c);
-            g.Children.Add(t);
-        }
-    }
-
-    private static void AddRow(Grid g, params UIElement[] cells)
-    {
-        g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var r = g.RowDefinitions.Count - 1;
-        for (var c = 0; c < cells.Length; c++)
-        {
-            if (cells[c] is FrameworkElement fe && fe.Margin == default) fe.Margin = new Thickness(0, 4, 0, 4);
-            else if (cells[c] is FrameworkElement fe2) fe2.Margin = new Thickness(fe2.Margin.Left, 4, fe2.Margin.Right, 4);
-            Grid.SetRow(cells[c], r);
-            Grid.SetColumn(cells[c], c);
-            g.Children.Add(cells[c]);
+            var on = new CheckBox { Content = $"Time slot {i + 1}", FontWeight = FontWeights.SemiBold };
+            on.SetResourceReference(StyleProperty, "ToggleSwitch");
+            var days = new ToggleButton[7];
+            var dayRow = new WrapPanel { Margin = new Thickness(0, 12, 0, 6) };
+            for (var d = 0; d < 7; d++)
+            {
+                days[d] = new ToggleButton { Content = Defaults.Days[d][..2], IsChecked = d < 5, MinWidth = 38, Padding = new Thickness(6, 5, 6, 5), Margin = new Thickness(0, 0, 4, 4), FontSize = 12.5 };
+                days[d].SetResourceReference(StyleProperty, "Pill");
+                days[d].MinWidth = 38;
+                days[d].Padding = new Thickness(6, 5, 6, 5);
+                days[d].Margin = new Thickness(0, 0, 4, 4);
+                dayRow.Children.Add(days[d]);
+            }
+            var from = new TimePicker();
+            var to = new TimePicker();
+            from.Value = "09:00";
+            to.Value = "17:00";
+            from.ValueChanged += (_, _) => OnFormChanged();
+            to.ValueChanged += (_, _) => OnFormChanged();
+            var body = new StackPanel();
+            body.Children.Add(dayRow);
+            body.Children.Add(Text("From", "Hint"));
+            body.Children.Add(from);
+            body.Children.Add(Text("To", "Hint"));
+            body.Children[^1].SetValue(MarginProperty, new Thickness(0, 8, 0, 4));
+            body.Children.Add(to);
+            var sp = new StackPanel();
+            sp.Children.Add(on);
+            sp.Children.Add(body);
+            SlotsPanel.Children.Add(Card(sp, 330));
+            _slots.Add(new SlotCard(on, days, from, to, body));
         }
     }
 
@@ -171,12 +451,14 @@ public partial class MainWindow : Window
     {
         if (_pages is null) return;
         for (var i = 0; i < _pages.Length; i++) _pages[i].Visibility = i == PageIndex ? Visibility.Visible : Visibility.Collapsed;
+        if (_pages[PageIndex] is ScrollViewer sv) sv.ScrollToTop();
         if (_pages[PageIndex] == PageReview) _ = UpdateReviewAsync();
         UpdateNav();
     }
 
     private void Back_Click(object sender, RoutedEventArgs e) { if (PageIndex > 0) Steps.SelectedIndex = PageIndex - 1; }
     private void Next_Click(object sender, RoutedEventArgs e) { if (PageIndex < _pages.Length - 1) Steps.SelectedIndex = PageIndex + 1; }
+    private void Go(int page) => Steps.SelectedIndex = page;
 
     private void UpdateNav()
     {
@@ -185,8 +467,8 @@ public partial class MainWindow : Window
         var last = _pages.Length - 1;
         BackButton.IsEnabled = i > 0;
         NextButton.Visibility = i < last ? Visibility.Visible : Visibility.Collapsed;
-        NextButton.Content = i == 0 ? "Let's go \U0001F680" : i == last - 1 ? "Review \U0001F440" : "Next \u2192";
-        TipText.Text = Tips[i % Tips.Length];
+        NextButton.Content = i == 0 ? (Configured ? "Settings →" : "Let's go \U0001F680") : i == last - 1 ? "Review \U0001F440" : "Next →";
+        StepProgress.Value = i;
         // Save only on the last page, and only once the settings are confirmed
         SaveButton.Visibility = i == last && ConfirmCheck.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         SaveButton.IsEnabled = !_busy && _serviceError is null;
@@ -209,12 +491,13 @@ public partial class MainWindow : Window
         TrustCheck.IsChecked = _status?.TrustedEnabled == true;
         ContactBox.Text = _status?.TrustedContact ?? "";
         _loading = false;
-        UpdateWelcome();
+        UpdateHome();
         UpdateBanner();
         UpdateTrustPage();
         OnFormChanged();
         if (_pages[PageIndex] == PageReview) await UpdateReviewAsync();
         UpdateNav();
+        UpdateCompact();
     }
 
     private bool Configured => _status?.Configured == true;
@@ -223,31 +506,17 @@ public partial class MainWindow : Window
     private void UpdateBanner()
     {
         BannerButton.Visibility = Visibility.Visible;
-        if (_serviceError is not null)
-        {
-            Show(_serviceError, "Try again", red: true);
-        }
-        else if (_status?.Uninstalling == true)
-        {
-            Show("NightGuard is being removed.", null, red: true);
-        }
-        else if (_status?.NightModeReason is { } nm)
-        {
-            Show(nm, null, red: false);
-        }
+        if (_serviceError is not null) Show(_serviceError, "Try again", red: true);
+        else if (_status?.Uninstalling == true) Show("NightGuard is being removed.", null, red: true);
+        else if (_status?.NightModeReason is { } nm) Show(nm, null, red: false);
         else if (_status is { ClientIsAdmin: false })
-        {
             Show("You're signed in with a standard account. You can look around and preview, but saving changes needs an administrator.", "Open as administrator", red: false);
-        }
-        else
-        {
-            Banner.Visibility = Visibility.Collapsed;
-        }
+        else Banner.Visibility = Visibility.Collapsed;
 
         void Show(string text, string? button, bool red)
         {
             Banner.Visibility = Visibility.Visible;
-            Banner.Background = (System.Windows.Media.Brush)FindResource(red ? "NgRed" : "NgIndigo");
+            Banner.Background = Res(red ? "NgRedDeep" : "NgIndigo");
             BannerText.Text = text;
             BannerButton.Content = button;
             BannerButton.Visibility = button is null ? Visibility.Collapsed : Visibility.Visible;
@@ -271,63 +540,184 @@ public partial class MainWindow : Window
         catch (Win32Exception) { return false; }   // the UAC prompt was cancelled
     }
 
-    // ================================================================ welcome page
-    private const string WelcomeNew =
-        "NightGuard is your bedtime bouncer. You tell it when you want to be in bed, and it makes sure your PC agrees with you. No more \"one more match\" at 2 AM.\n\n" +
-        "We'll walk through a few short steps together:\n\n" +
-        "   \U0001F6CF\uFE0F  Bedtimes: when your nights start and end.\n" +
-        "   \u23F0  Warnings: friendly (then less friendly) popups before bedtime.\n" +
-        "   \U0001F50C  At bedtime: what your PC does when time is up.\n" +
-        "   \U0001F4AC  Your why and journal: your reason, a morning cheer, streaks and badges.\n" +
-        "   \U0001F3AE  Game and screen time: daily budgets, if you want them.\n" +
-        "   \U0001F6AB  Block sites and apps: goodbye, 1 AM doomscrolling (optional).\n" +
-        "   \U0001F510  Trusted person: hand the off switch to someone else (optional).\n" +
-        "   \u2705  Review and save: check everything, then switch it on.\n\n" +
-        "The defaults are sensible, so if you're not sure about something, just click Next. Nothing starts until the very last page.\n\n" +
-        "Ready? Click \"Let's go\". Future you says thanks. \U0001F64C\n\n" +
-        "\u26A0\uFE0F Heads up: NightGuard really does shut down, hibernate and lock this PC. It comes with no warranty, and you use it at your own risk, so save your work at the warnings.";
-
-    private void UpdateWelcome()
+    // ================================================================ welcome / home page
+    private void UpdateHome()
     {
         var s = _status;
-        if (s is { Configured: true })
-        {
-            Scene.Headline = "NightGuard is on duty \U0001F6E1\uFE0F";
-            Scene.Tagline = s.Streak > 1 ? $"{s.Streak} clean nights in a row. Look at you go! \U0001F525" : "Your nights are in good hands. Sleep tight!";
-            WelcomeText.Text = "It's guarding your nights. No take-backs: that's the point.\n\n" +
-                "You can always make it STRICTER (earlier bedtime, more blocking, less game time) and save right away. " +
-                "Making it LOOSER works like quitting anything else: you ask, wait 7 days, and then decide with a clear head.";
-            var next = s.CurrentNight is { } cur ? $"Locked right now, until {cur.End:dddd} {TimeText.Format(cur.End)}."
-                     : s.NextNight is { } n ? $"Next locked night: {n.Start:dddd} {TimeText.Format(n.Start)} until {n.End:dddd} {TimeText.Format(n.End)}."
-                     : "No locked night scheduled.";
-            var end = s.EndDate is { } ed && DateTime.TryParseExact(ed, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
-                ? $"Last night: {d:dddd d MMMM yyyy}. After that, NightGuard removes itself. It can't be uninstalled before then."
-                : "No end date: it runs until you uninstall it (after a 7-day cool-off).";
-            var lockText = s.TrustedEnabled ? "Trusted-person mode is on: changes and uninstall need your trusted person's code." : s.UnlockText;
-            var streak = s.Streak > 0 ? $"\U0001F525 {s.Streak} clean night(s) in a row." : "\U0001F331 Your streak starts tonight.";
-            StatusCardText.Text = string.Join("\n", new[] { next, end, lockText, streak, s.SafetyStandDown is { } sd ? $"Standing down: {sd}" : "" }.Where(x => x.Length > 0));
-            StatusCard.Visibility = Visibility.Visible;
-        }
-        else
-        {
-            Scene.Headline = "Hi there, night owl! \U0001F989";
-            Scene.Tagline = "Let's get you to bed on time. Future you is already grateful.";
-            WelcomeText.Text = WelcomeNew;
-            StatusCard.Visibility = _status?.SafetyStandDown is { } p ? Visibility.Visible : Visibility.Collapsed;
-            StatusCardText.Text = _status?.SafetyStandDown is { } p2 ? $"The saved settings can't be used ({p2}). Saving new ones fixes it." : "";
-        }
-        SaveButton.Content = Configured ? "Save and apply \u2728" : "Start NightGuard \U0001F319";
+        var home = s is { Configured: true };
+        NewUserPanel.Visibility = home ? Visibility.Collapsed : Visibility.Visible;
+        HomePanel.Visibility = home ? Visibility.Visible : Visibility.Collapsed;
+        WelcomeStepText.Text = home ? "Home" : "Welcome";
+        StandDownCard.Visibility = s?.SafetyStandDown is not null ? Visibility.Visible : Visibility.Collapsed;
+        StandDownText.Text = s?.SafetyStandDown is { } sd
+            ? (home ? $"NightGuard is standing down: {sd}" : $"The saved settings can't be used ({sd}). Saving new ones fixes it.")
+            : "";
+        SaveButton.Content = Configured ? "Save and apply ✨" : "Start NightGuard \U0001F319";
         JournalButton.IsEnabled = StatusButton.IsEnabled = _serviceError is null;
         UninstallButton.IsEnabled = Configured;
-        UninstallButton.Content = !Configured || TrustedOn ? "Uninstall..." : s?.UnlockState switch
+        UninstallText.Text = !Configured || TrustedOn ? "Uninstall..." : s?.UnlockState switch
         {
             "Open" => "Uninstall...",
             "Waiting" => "Cool-off running...",
             _ => "Request uninstall...",
         };
+
+        if (s is not { Configured: true })
+        {
+            Scene.Headline = "Hi there, night owl!";
+            Scene.Tagline = "I'm Hoot. Let's get you to bed on time. Future you is already grateful.";
+            Scene.OwlMood = OwlMood.Awake;
+            return;
+        }
+
+        Scene.Headline = s.CurrentNight is not null ? "Shh. It's sleepy time." : "NightGuard is on duty";
+        Scene.Tagline = s.Streak > 1 ? $"{s.Streak} clean nights in a row. Look at you go! \U0001F525" : "Your nights are in good hands. Sleep tight!";
+        Scene.OwlMood = s.CurrentNight is not null ? OwlMood.Sleepy : OwlMood.Awake;
+
+        if (s.CurrentNight is { } cur)
+        {
+            TonightBig.Text = "Locked \U0001F634";
+            TonightText.Text = $"Until {cur.End:dddd} {TimeText.Format(cur.End)}. Go to sleep!";
+        }
+        else if (s.NextNight is { } n)
+        {
+            TonightBig.Text = TimeText.Format(n.Start);
+            TonightText.Text = (n.Start.Date == DateTime.Today || n.Start.Date == DateTime.Today.AddDays(1) && n.Start.Hour < 12
+                ? "Bedtime tonight" : $"Next bedtime: {n.Start:dddd}") + $". Unlocks {TimeText.Format(n.End)}.";
+        }
+        else
+        {
+            TonightBig.Text = "Free night \U0001F389";
+            TonightText.Text = "No locked night coming up.";
+        }
+
+        StreakBig.Text = s.Streak > 0 ? $"\U0001F525 {s.Streak}" : "\U0001F331 0";
+        StreakText.Text = s.Streak > 0
+            ? $"clean night{(s.Streak == 1 ? "" : "s")} in a row. Best: {Math.Max(s.BestStreak, s.Streak)}."
+            : "Your streak starts tonight.";
+
+        var p = Commitment.Progress(s.CommitNights, s.CommitStart, DateTime.Today);
+        CommitRing.Fill = Res("NgMoon");
+        if (p is null)
+        {
+            CommitBig.Text = "Not signed yet";
+            CommitText.Text = "Make a promise to yourself on the Your why step.";
+            CommitRing.Fraction = 0;
+            CommitRingText.Text = "?";
+        }
+        else if (p.Forever)
+        {
+            CommitBig.Text = "Forever";
+            CommitText.Text = $"Night {p.Night}. No finish line, just your new normal.";
+            CommitRing.Fill = Res("NgTeal");
+            CommitRing.Fraction = 1;
+            CommitRingText.Text = "∞";
+        }
+        else
+        {
+            CommitBig.Text = p.Done ? "Done! \U0001F389" : $"Night {p.Night} of {p.Total}";
+            CommitText.Text = p.Done ? $"You kept your {p.Total}-night promise." : $"{p.Total - p.NightsPassed} to go.";
+            CommitRing.Fraction = (double)p.NightsPassed / p.Total;
+            CommitRingText.Text = $"{Math.Min(100, p.NightsPassed * 100 / p.Total)}%";
+        }
+        CommitDoneCard.Visibility = p is { Done: true } ? Visibility.Visible : Visibility.Collapsed;
+        if (p is { Done: true })
+        {
+            CommitDoneTitle.Text = $"You did it! {p.Total} nights. \U0001F389";
+            CommitDoneText.Text = "You kept a promise to yourself, which is rarer than it sounds. Ready to go again? Pick a new number, or go all in with forever.";
+            if (!_celebratedDone)
+            {
+                _celebratedDone = true;
+                Dispatcher.BeginInvoke(() => Confetti.Burst(Root), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            }
+        }
+
+        HomeWhy.Text = string.IsNullOrWhiteSpace(s.Why)
+            ? "You haven't written your why yet. It's the most useful thing in here, and it takes a minute."
+            : $"“{s.Why}”";
+        HomePlan.Text = string.IsNullOrWhiteSpace(s.Plan) ? "" : $"Your plan: when the final call pops up, I will {s.Plan}";
+        HomePlan.Visibility = string.IsNullOrWhiteSpace(s.Plan) ? Visibility.Collapsed : Visibility.Visible;
+
+        var end = s.EndDate is { } ed && DateTime.TryParseExact(ed, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            ? $"Last night: {d:dddd d MMMM yyyy} (an end date from an earlier version). After that, NightGuard removes itself.\n" : "";
+        var lockText = s.TrustedEnabled ? "Trusted-person mode is on: changes and uninstall need your trusted person's code." : s.UnlockText;
+        StatusCardText.Text = end + lockText;
+        WelcomeText.Text = "You can always make it stricter and save right away. Making it looser works like quitting anything else: you ask, wait 7 days, and then decide with a clear head.";
+    }
+
+    private void EditWhy_Click(object sender, RoutedEventArgs e) => Go(1);
+
+    private void CommitAgain_Click(object sender, RoutedEventArgs e) => StartCommitAgain();
+
+    /// <summary>The commitment is done: open the Your why step, ready to pick and sign a new one.</summary>
+    public void StartCommitAgain()
+    {
+        _recommit = true;
+        _signed = false;
+        SignButton.IsSigned = false;
+        UpdateCommitUi();
+        Go(1);
+        Dispatcher.BeginInvoke(() => ForeverCard.BringIntoView(), System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void Celebrate_Click(object sender, RoutedEventArgs e) => Confetti.Burst(Root);
+
+    // ================================================================ the commitment
+    private void CommitChoice_Click(object sender, RoutedEventArgs e)
+    {
+        var tag = (int)((FrameworkElement)sender).Tag;
+        Choose(tag < 0 ? _commitCustom.Value : tag, fromCustom: tag < 0);
+    }
+
+    private void Choose(int nights, bool fromCustom)
+    {
+        if (_signed && nights != _commitChoice) { _signed = false; SignButton.IsSigned = false; }
+        _commitChoice = nights;
+        _customChosen = fromCustom || (nights != 0 && !Commitment.Choices.Contains(nights));
+        UpdateCommitUi();
+        OnFormChanged();
+    }
+
+    private bool _customChosen;
+
+    private void OnSigned()
+    {
+        _signed = true;
+        UpdateCommitUi();
+        OnFormChanged();
+        var p = SignButton.TranslatePoint(new Point(SignButton.ActualWidth / 2, 20), Root);
+        Confetti.Burst(Root, p);
+    }
+
+    private void UpdateCommitUi()
+    {
+        foreach (var c in _commitCards) c.IsChecked = !_customChosen && _commitChoice == (int)c.Tag;
+        ForeverCard.IsChecked = _commitChoice == 0;
+        _customCommitCard.IsChecked = _customChosen && _commitChoice is > 0;
+        SignButton.IsEnabled = _commitChoice is not null;
+        var what = _commitChoice switch { null => "", 0 => "forever", { } n => Commitment.Describe(n) };
+        SignButton.Prompt = _commitChoice is null ? "Pick a number above, then sign" : $"Hold to sign: {what}";
+        var p = Commitment.Progress(_savedCommit, _savedCommitStart, DateTime.Today);
+        var keepsOld = _signed && !_recommit && _commitChoice == _savedCommit && p is not null;
+        SignButton.SignedText = keepsOld && p is { } pp
+            ? (pp.Forever ? $"Signed: forever. Night {pp.Night} and counting." : pp.Done ? $"Done: {pp.Total} of {pp.Total} nights. Time to commit again?" : $"Signed: night {pp.Night} of {pp.Total}.")
+            : $"Signed: {what}. Night 1 starts tonight.";
+        SignButton.IsSigned = _signed;
+        CommitStateText.Text = _signed && !keepsOld && Configured ? "Saved when you click Save on the last step." : "";
     }
 
     // ================================================================ form <-> settings
+    private static string Compose(Defaults.WarningPreset p, string custom)
+    {
+        var extra = custom.Trim().Replace("\r", "", StringComparison.Ordinal).Replace("\n", @"\n", StringComparison.Ordinal);
+        return extra.Length == 0 ? p.Message : p.Message + Defaults.CustomSeparator + extra;
+    }
+
+    private static string CustomPart(Defaults.WarningPreset p, string message) =>
+        message.StartsWith(p.Message + Defaults.CustomSeparator, StringComparison.Ordinal)
+            ? message[(p.Message.Length + Defaults.CustomSeparator.Length)..].Replace(@"\n", " ", StringComparison.Ordinal)
+            : "";
+
     private void LoadForm(NightGuardConfig cfg)
     {
         _loading = true;
@@ -338,41 +728,50 @@ public partial class MainWindow : Window
             _nights[i].Bed.Value = s.Bedtime;
             _nights[i].Unlock.Value = s.Unlock;
         }
-        int[] defaultMinutes = [30, 5, 60, 15, 10, 2];
-        var used = cfg.Warnings.Select(w => w.MinutesBefore).ToList();
-        var spare = defaultMinutes.Concat(Enumerable.Range(1, 360)).Where(m => !used.Contains(m)).Distinct().GetEnumerator();
-        for (var i = 0; i < 6; i++)
+
+        // Warnings: each one goes to the card that matches its timing (older setups could have up to 6)
+        foreach (var w in _warns)
         {
-            var row = _warns[i];
-            if (i < cfg.Warnings.Count)
-            {
-                var w = cfg.Warnings[i];
-                row.On.IsChecked = true;
-                row.Minutes.Value = w.MinutesBefore;
-                row.Sound.IsChecked = w.Sound;
-                row.Message.Text = w.Message;
-            }
-            else
-            {
-                spare.MoveNext();
-                row.On.IsChecked = false;
-                row.Minutes.Value = spare.Current;
-                row.Sound.IsChecked = true;
-                row.Message.Text = Defaults.WarningGeneric;
-            }
+            w.On.IsChecked = false;
+            w.Minutes.Value = w.Preset.DefaultMinutes;
+            w.Sound.IsChecked = true;
+            w.Custom.Text = "";
         }
-        ActionBox.SelectedItem = Defaults.Actions.Contains(cfg.Action) ? cfg.Action : "Hibernate";
-        CountdownBox.Value = cfg.CountdownSeconds;
-        RecheckBox.Value = cfg.RecheckMinutes;
-        NightModeBox.Value = cfg.NightModeMinutes;
-        var end = ScheduleMath.EndDate(cfg);
-        EndDateCheck.IsChecked = end is not null;
-        EndDatePicker.DisplayDateStart = end is { } e0 && e0 < DateTime.Today ? e0 : DateTime.Today;
-        EndDatePicker.SelectedDate = end ?? DateTime.Today.AddDays(30);
-        EndDatePicker.IsEnabled = end is not null;
+        var used = new HashSet<int>();
+        foreach (var setting in cfg.Warnings)
+        {
+            var idx = Defaults.PresetIndex(setting.MinutesBefore);
+            if (!used.Add(idx)) continue;
+            var w = _warns[idx];
+            w.On.IsChecked = true;
+            w.Minutes.Value = setting.MinutesBefore;
+            w.Sound.IsChecked = setting.Sound;
+            w.Custom.Text = CustomPart(w.Preset, setting.Message);
+        }
+
+        SelectAction(cfg.Action);
+        CountdownPills.Value = cfg.CountdownSeconds;
+        RecheckPills.Value = cfg.RecheckMinutes;
+        NightModePills.Value = cfg.NightModeMinutes;
+        _savedEndDate = cfg.EndDate;
+        LegacyEndCard.Visibility = cfg.EndDate is null ? Visibility.Collapsed : Visibility.Visible;
+        LegacyEndText.Text = ScheduleMath.EndDate(cfg) is { } end
+            ? $"📅 An earlier version set an end date: the last locked night is {end:dddd d MMMM yyyy}, then NightGuard removes itself. It stays as it is."
+            : "";
+
         WhyBox.Text = cfg.Why;
+        PlanBox.Text = cfg.Plan;
         CheckInCheck.IsChecked = cfg.MorningCheckIn;
         DesktopCheck.IsChecked = cfg.ShortcutDesktop;
+
+        _savedCommit = cfg.CommitNights;
+        _savedCommitStart = cfg.CommitStart;
+        _commitChoice = cfg.CommitNights;
+        _signed = cfg.CommitNights is not null;
+        _recommit = false;
+        _customChosen = cfg.CommitNights is > 0 and var n && !Commitment.Choices.Contains(n);
+        if (_customChosen) _commitCustom.Value = cfg.CommitNights!.Value;
+        UpdateCommitUi();
 
         var b = cfg.Blocking;
         BlockCheck.IsChecked = b.Enabled;
@@ -402,14 +801,15 @@ public partial class MainWindow : Window
         ScreenWe.Value = st.ScreenMinutesWeekend;
         ResetHour.Value = st.ResetHour;
         GraceBox.Value = st.ShutdownGraceMinutes;
-        LimitAction.SelectedItem = Defaults.ScreenActions.Contains(st.LimitAction) ? st.LimitAction : "Lock";
-        WarnAtBox.Text = string.Join(", ", st.WarnAtMinutesLeft);
+        LimitPills.Value = Math.Max(0, Array.IndexOf(Defaults.ScreenActions, st.LimitAction));
+        WarnAtPills.Values = st.WarnAtMinutesLeft.Where(m => m > 0).ToList();
         LaunchersCheck.IsChecked = st.CloseLaunchers;
         GameFolders.Text = string.Join(Environment.NewLine, st.GameFolders);
         GameProcs.Text = string.Join(Environment.NewLine, st.GameProcesses);
         IgnoreProcs.Text = string.Join(Environment.NewLine, st.IgnoreProcesses);
         LauncherProcs.Text = string.Join(Environment.NewLine, st.LauncherProcesses);
         UsageText.Text = _status is { Configured: true, ScreenTimeEnabled: true } ? _status.UsageText : "";
+        UsageText.Visibility = UsageText.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         _loading = false;
     }
 
@@ -422,14 +822,26 @@ public partial class MainWindow : Window
         for (var i = 0; i < 7; i++)
             cfg.Schedule[Defaults.Days[i]] = new NightSchedule { Enabled = _nights[i].On.IsChecked == true, Bedtime = _nights[i].Bed.Value, Unlock = _nights[i].Unlock.Value };
         cfg.Warnings = _warns.Where(w => w.On.IsChecked == true)
-            .Select(w => new WarningSetting { MinutesBefore = w.Minutes.Value, Sound = w.Sound.IsChecked == true, Message = w.Message.Text }).ToList();
-        cfg.Action = ActionBox.SelectedItem as string ?? "Hibernate";
-        cfg.CountdownSeconds = CountdownBox.Value;
-        cfg.RecheckMinutes = RecheckBox.Value;
-        cfg.NightModeMinutes = NightModeBox.Value;
-        cfg.EndDate = EndDateCheck.IsChecked == true && EndDatePicker.SelectedDate is { } ed ? ed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null;
+            .Select(w => new WarningSetting { MinutesBefore = w.Minutes.Value, Sound = w.Sound.IsChecked == true, Message = Compose(w.Preset, w.Custom.Text) }).ToList();
+        cfg.Action = _action;
+        cfg.CountdownSeconds = CountdownPills.Value;
+        cfg.RecheckMinutes = RecheckPills.Value;
+        cfg.NightModeMinutes = NightModePills.Value;
+        cfg.EndDate = _savedEndDate;   // no longer set here; an existing one is kept as it is
         cfg.Why = WhyBox.Text.Trim();
+        cfg.Plan = PlanBox.Text.Trim();
         cfg.MorningCheckIn = CheckInCheck.IsChecked == true;
+        if (_signed && _commitChoice is { } c)
+        {
+            var keep = !_recommit && c == _savedCommit && _savedCommitStart is not null;
+            cfg.CommitNights = c;
+            cfg.CommitStart = keep ? _savedCommitStart : DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+        else
+        {
+            cfg.CommitNights = _savedCommit;
+            cfg.CommitStart = _savedCommitStart;
+        }
         cfg.ShortcutStartMenu = true;
         cfg.ShortcutDesktop = DesktopCheck.IsChecked == true;
         cfg.Blocking = new BlockingSettings
@@ -450,9 +862,8 @@ public partial class MainWindow : Window
             ResetHour = ResetHour.Value,
             GameMinutesWeekday = GameWd.Value, GameMinutesWeekend = GameWe.Value,
             ScreenMinutesWeekday = ScreenWd.Value, ScreenMinutesWeekend = ScreenWe.Value,
-            WarnAtMinutesLeft = WarnAtBox.Text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries)
-                .Select(x => int.TryParse(x, NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : -1).ToList(),
-            LimitAction = LimitAction.SelectedItem as string ?? "Lock",
+            WarnAtMinutesLeft = WarnAtPills.Values,
+            LimitAction = Defaults.ScreenActions[Math.Clamp(LimitPills.Value, 0, Defaults.ScreenActions.Length - 1)],
             ShutdownGraceMinutes = GraceBox.Value,
             CloseLaunchers = LaunchersCheck.IsChecked == true,
             GameFolders = Lines(GameFolders.Text),
@@ -464,6 +875,26 @@ public partial class MainWindow : Window
     }
 
     // ================================================================ live checks
+    /// <summary>Hours from 6 PM on the evening a night starts (bedtime and unlock), for the little timeline bars.</summary>
+    private static (double Start, double End) Hours(string bed, string unlock)
+    {
+        var b = ScheduleMath.ParseTime(bed).TotalHours;
+        var u = ScheduleMath.ParseTime(unlock).TotalHours;
+        var start = b < 12 ? b + 24 : b;
+        return (start - 18, u + 24 - 18);
+    }
+
+    private static void SetBar(NightCard r, bool on)
+    {
+        var (s, e) = Hours(r.Bed.Value, r.Unlock.Value);
+        s = Math.Clamp(s, 0, 18);
+        e = Math.Clamp(e, s, 18);
+        r.Before.Width = new GridLength(Math.Max(0.001, s), GridUnitType.Star);
+        r.Locked.Width = new GridLength(Math.Max(0.001, e - s), GridUnitType.Star);
+        r.After.Width = new GridLength(Math.Max(0.001, 18 - e), GridUnitType.Star);
+        r.Fill.Opacity = on ? 1 : 0.2;
+    }
+
     private void OnFormChanged()
     {
         if (_loading || _pages is null) return;
@@ -472,49 +903,44 @@ public partial class MainWindow : Window
             var r = _nights[i];
             var on = r.On.IsChecked == true;
             r.Bed.IsEnabled = r.Unlock.IsEnabled = on;
-            if (!on) { r.Note.Text = "\U0001F389 free night"; r.Note.Foreground = null; continue; }
+            SetBar(r, on);
+            if (!on) { r.Note.Text = "\U0001F389 Free night"; r.Note.ClearValue(TextBlock.ForegroundProperty); continue; }
             var hours = ScheduleMath.LockedHours(r.Bed.Value, r.Unlock.Value);
-            var text = hours is { } h ? $"\U0001F634 locked {h:0.#} h" : "\u26A0\uFE0F unlock must be after bedtime";
-            if (ScheduleMath.ParseTime(r.Bed.Value).TotalHours < 12) text += ", early " + Defaults.DayNames[(i + 1) % 7][..3];
+            var text = hours is { } h ? $"\U0001F634 Locked {h:0.#} hours" : "⚠️ Unlock must be after bedtime";
+            if (ScheduleMath.ParseTime(r.Bed.Value).TotalHours < 12) text += $" (early {Defaults.DayNames[(i + 1) % 7][..3]})";
             r.Note.Text = text;
-            r.Note.Foreground = hours is null or > 16 ? (System.Windows.Media.Brush)FindResource("NgRed") : null;
+            if (hours is null or > 16) r.Note.Foreground = Res("NgRed"); else r.Note.ClearValue(TextBlock.ForegroundProperty);
         }
-        foreach (var w in _warns) w.Minutes.IsEnabled = w.Sound.IsEnabled = w.Message.IsEnabled = w.Preview.IsEnabled = w.On.IsChecked == true;
+        foreach (var w in _warns) w.Body.IsEnabled = w.On.IsChecked == true;
         ScreenBody.IsEnabled = ScreenCheck.IsChecked == true;
-        GraceBox.IsEnabled = LimitAction.SelectedItem as string == "Shutdown";
+        GracePanel.Visibility = LimitPills.Value == 1 ? Visibility.Visible : Visibility.Collapsed;
         BlockBody.IsEnabled = BlockCheck.IsChecked == true;
-        foreach (var s in _slots)
-        {
-            var on = s.On.IsChecked == true;
-            foreach (var d in s.Days) d.IsEnabled = on;
-            s.From.IsEnabled = s.To.IsEnabled = on;
-        }
+        BlockBedtimeCheck.IsEnabled = BlockCheck.IsChecked == true;
+        foreach (var s in _slots) s.Body.IsEnabled = s.On.IsChecked == true;
         if (_pages[PageIndex] != PageReview && ConfirmCheck.IsChecked == true) ConfirmCheck.IsChecked = false;
 
         var errs = ConfigValidator.Validate(ReadForm());
         if (errs.Count > 0)
         {
-            BottomHint.Foreground = (System.Windows.Media.Brush)FindResource("NgRed");
+            BottomHint.Foreground = Res("NgRed");
             BottomHint.Text = "Fix before saving: " + errs[0] + (errs.Count > 1 ? $" (+{errs.Count - 1} more)" : "");
         }
         else
         {
-            BottomHint.ClearValue(TextBlock.ForegroundProperty);
+            BottomHint.Foreground = Res("NgMuted");
             BottomHint.Text = Configured
                 ? "Stricter changes save right away; looser ones need the 7-day cool-off."
-                : "Nothing starts until the last page. Jump to any step on the left.";
+                : "Nothing starts until the last step. Jump to any step on the left.";
         }
     }
 
-    private void ActionBox_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
-        ActionDesc.Text = ActionBox.SelectedItem is string a && ActionDescriptions.TryGetValue(a, out var d) ? d : "";
-
-    private void LimitAction_SelectionChanged(object sender, SelectionChangedEventArgs e) => OnFormChanged();
     private void Section_Changed(object sender, RoutedEventArgs e) => OnFormChanged();
-    private void EndDate_Changed(object sender, RoutedEventArgs e) => EndDatePicker.IsEnabled = EndDateCheck.IsChecked == true;
 
-    private void WhyBox_TextChanged(object sender, TextChangedEventArgs e) =>
-        WhyCount.Text = $"{WhyBox.Text.Length} / 300" + (WhyBox.Text.Trim().Length == 0 ? "   (empty: no reminder will be shown)" : "");
+    private void WhyBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (WhyCount is null) return;
+        WhyCount.Text = $"{WhyBox.Text.Length} / 300";
+    }
 
     // ================================================================ bedtimes page
     private void SetNights(IEnumerable<string> days)
@@ -533,26 +959,20 @@ public partial class MainWindow : Window
     private void QuickWeek_Click(object sender, RoutedEventArgs e) => SetNights(["Sun", "Mon", "Tue", "Wed", "Thu"]);
     private void QuickWeekend_Click(object sender, RoutedEventArgs e) => SetNights(["Fri", "Sat"]);
 
-    // ================================================================ warnings page and previews
-    private void Examples_Click(object sender, RoutedEventArgs e)
+    // ================================================================ previews
+    private void PreviewWarning(WarnCard card)
     {
-        if (!Ask.YesNo(this, "Replace the messages of the ticked popups with example messages that match their timing?")) return;
-        foreach (var w in _warns.Where(w => w.On.IsChecked == true))
-            w.Message.Text = Defaults.WarningExamples.First(x => w.Minutes.Value >= x.MinMinutes).Message;
-    }
-
-    private void PreviewWarning_Click(object sender, RoutedEventArgs e)
-    {
-        var row = _warns[(int)((Button)sender).Tag];
         var cfg = ReadForm();
         var now = DateTime.Now;
         var night = ScheduleMath.NextNight(cfg, now) ?? ScheduleMath.GetNight(cfg, now, ignoreEndDate: true)
                     ?? new Night("", now.Date, now.Date.AddDays(1), now.Date.AddDays(1).AddHours(6));
-        var text = ScheduleMath.FormatMessage(row.Message.Text, cfg, night, row.Minutes.Value, "t");
-        var ticked = _warns.Where(w => w.On.IsChecked == true).Select(w => w.Minutes.Value).DefaultIfEmpty(row.Minutes.Value).Min();
-        if (row.Minutes.Value <= ticked && cfg.Why.Length > 0) text += $"\n\nRemember why you started:\n“{cfg.Why}”";
-        var urgent = row.Minutes.Value <= 5;
-        if (row.Sound.IsChecked == true) System.Media.SystemSounds.Exclamation.Play();
+        var minutes = card.Minutes.Value;
+        var text = ScheduleMath.FormatMessage(Compose(card.Preset, card.Custom.Text), cfg, night, minutes, "t");
+        var final = _warns.Where(w => w.On.IsChecked == true).Select(w => w.Minutes.Value).DefaultIfEmpty(minutes).Min();
+        if (minutes <= final && cfg.Why.Length > 0) text += $"\n\nRemember why you started:\n“{cfg.Why}”";
+        if (minutes <= final && cfg.Plan.Length > 0) text += $"\n\nYour plan: {cfg.Plan}";
+        var urgent = minutes <= 5;
+        if (card.Sound.IsChecked == true) System.Media.SystemSounds.Exclamation.Play();
         new AlertWindow(urgent ? "Final call!" : "Bedtime is coming", text, urgent, 0, preview: true) { Owner = this }.Show();
     }
 
@@ -614,17 +1034,17 @@ public partial class MainWindow : Window
         if (TrustedOn)
         {
             TrustState.Text = "Trusted-person mode is ON. Saving changes or uninstalling needs the code.";
-            TrustState.Foreground = (System.Windows.Media.Brush)FindResource("NgGreen");
+            TrustState.Foreground = Res("NgGreen");
         }
         else if (TrustCheck.IsChecked == true)
         {
-            TrustState.Text = "Your trusted person sets the code when you click " + SaveButton.Content + " on the last page, so have them next to you then.";
-            TrustState.Foreground = (System.Windows.Media.Brush)FindResource("NgAccent");
+            TrustState.Text = "Your trusted person sets the code when you click " + SaveButton.Content + " on the last step, so have them next to you then.";
+            TrustState.Foreground = Res("NgMoon");
         }
         else
         {
             TrustState.Text = "Off. Anyone with an administrator account on this PC can change the settings (within the self-lock rules).";
-            TrustState.ClearValue(TextBlock.ForegroundProperty);
+            TrustState.Foreground = Res("NgMuted");
         }
     }
 
@@ -654,66 +1074,163 @@ public partial class MainWindow : Window
     }
 
     // ================================================================ review page
+    private Border ReviewCard(string emoji, string title, int page, params UIElement[] body)
+    {
+        var sp = new StackPanel();
+        var head = new DockPanel { Margin = new Thickness(0, 0, 0, 12) };
+        var edit = new Button { Content = "Edit", VerticalAlignment = VerticalAlignment.Center };
+        edit.SetResourceReference(StyleProperty, "LinkButton");
+        edit.Click += (_, _) => Go(page);
+        DockPanel.SetDock(edit, Dock.Right);
+        head.Children.Add(edit);
+        var badge = Badge(emoji, 40);
+        DockPanel.SetDock(badge, Dock.Left);
+        head.Children.Add(badge);
+        var t = Text(title, "H2");
+        t.Margin = new Thickness(0);
+        t.VerticalAlignment = VerticalAlignment.Center;
+        head.Children.Add(t);
+        sp.Children.Add(head);
+        foreach (var b in body) sp.Children.Add(b);
+        return Card(sp, 318);
+    }
+
+    private TextBlock Line(string text, bool strong = false, string? brush = null)
+    {
+        var t = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, FontSize = strong ? 15 : 13.5, Margin = new Thickness(0, 0, 0, 5), Foreground = Res(brush ?? (strong ? "NgText" : "NgMuted")) };
+        if (strong) t.FontWeight = FontWeights.SemiBold;
+        return t;
+    }
+
+    private UIElement Week(NightGuardConfig cfg)
+    {
+        var g = new Grid();
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        for (var i = 0; i < 7; i++)
+        {
+            var s = cfg.Schedule[Defaults.Days[i]];
+            g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var day = new TextBlock { Text = Defaults.Days[i], FontSize = 13, Foreground = Res("NgMuted"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 4, 0, 4) };
+            Grid.SetRow(day, i);
+            g.Children.Add(day);
+            var on = s.Enabled && ScheduleMath.IsTime(s.Bedtime) && ScheduleMath.IsTime(s.Unlock);
+            var (a, b) = on ? Hours(s.Bedtime, s.Unlock) : (0, 0);
+            a = Math.Clamp(a, 0, 18); b = Math.Clamp(b, a, 18);
+            var bar = new Grid { Height = 8, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+            bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(0.001, a), GridUnitType.Star) });
+            bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(0.001, b - a), GridUnitType.Star) });
+            bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(0.001, 18 - b), GridUnitType.Star) });
+            var track = new Border { CornerRadius = new CornerRadius(4), Background = Res("NgSurface2") };
+            Grid.SetColumnSpan(track, 3);
+            bar.Children.Add(track);
+            if (on)
+            {
+                var fill = new Border { CornerRadius = new CornerRadius(4), Background = Res("NgMoon") };
+                Grid.SetColumn(fill, 1);
+                bar.Children.Add(fill);
+            }
+            Grid.SetRow(bar, i);
+            Grid.SetColumn(bar, 1);
+            g.Children.Add(bar);
+            var t = new TextBlock
+            {
+                Text = on ? $"{TimeText.Format(s.Bedtime)} to {TimeText.Format(s.Unlock)}" : "free 🎉", FontSize = 12,
+                Foreground = Res(on ? "NgText" : "NgMuted"), VerticalAlignment = VerticalAlignment.Center,
+            };
+            Grid.SetRow(t, i);
+            Grid.SetColumn(t, 2);
+            g.Children.Add(t);
+        }
+        return g;
+    }
+
     private async Task UpdateReviewAsync()
     {
         ConfirmCheck.IsChecked = false;
         var cfg = ReadForm();
         var errs = ConfigValidator.Validate(cfg);
-        var sb = new StringBuilder();
-        void Add(string l = "") => sb.AppendLine(l);
-        if (errs.Count > 0)
+        ErrorCard.Visibility = errs.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ErrorText.Text = string.Join("\n", errs.Select(e => "•  " + e));
+        LooseCard.Visibility = Visibility.Collapsed;
+
+        ReviewCards.Children.Clear();
+
+        // Your why
+        var why = new List<UIElement>();
+        if (cfg.Why.Length > 0)
         {
-            Add("\u26A0\uFE0F  PLEASE FIX THESE FIRST:");
-            foreach (var e in errs) Add("  - " + e);
-            Add();
+            var q = new TextBlock { Text = $"“{cfg.Why}”", Margin = new Thickness(0, 0, 0, 8) };
+            q.SetResourceReference(StyleProperty, "SerifQuote");
+            q.FontSize = 18;
+            q.LineHeight = 25;
+            why.Add(q);
         }
-        Add("\U0001F6CF\uFE0F  BEDTIMES");
-        for (var i = 0; i < 7; i++)
+        else why.Add(Line("No why written yet. It really helps!", brush: "NgOrange"));
+        if (cfg.Plan.Length > 0) why.Add(Line($"Plan: I will {cfg.Plan}"));
+        why.Add(Line(cfg.CommitNights switch
         {
-            var s = cfg.Schedule[Defaults.Days[i]];
-            var name = $"{Defaults.DayNames[i]} night".PadRight(17);
-            Add(s.Enabled ? $"  {name} {TimeText.Format(s.Bedtime)} until {TimeText.Format(s.Unlock)}" : $"  {name} free");
+            null => "\U0001F3AF Not committed yet",
+            0 => "\U0001F3AF Committed: forever ∞",
+            { } n => $"\U0001F3AF Committed: {n} nights",
+        }, strong: true));
+        why.Add(Line($"Morning check-in: {(cfg.MorningCheckIn ? "on" : "off")}"));
+        ReviewCards.Children.Add(ReviewCard("\U0001F4AC", "Your why", 1, [.. why]));
+
+        // Bedtimes
+        ReviewCards.Children.Add(ReviewCard("\U0001F6CF️", "Bedtimes", 2, Week(cfg)));
+
+        // Warnings
+        var warn = new List<UIElement>();
+        if (cfg.Warnings.Count == 0) warn.Add(Line("No warnings. Bold move.", brush: "NgOrange"));
+        foreach (var w in cfg.Warnings)
+        {
+            var p = Defaults.WarningPresets[Defaults.PresetIndex(w.MinutesBefore)];
+            warn.Add(Line($"{p.Emoji}  {p.Name}: {w.MinutesBefore} min before{(w.Sound ? "  \U0001F514" : "")}", strong: true));
         }
-        Add();
-        Add("\u23F0  WARNINGS");
-        if (cfg.Warnings.Count == 0) Add("  none");
-        foreach (var w in cfg.Warnings) Add($"  {w.MinutesBefore} min before bedtime{(w.Sound ? ", with sound" : "")}");
-        Add();
-        Add("\U0001F50C  AT BEDTIME");
-        Add($"  {cfg.Action} after a {cfg.CountdownSeconds} second countdown, repeating every {cfg.RecheckMinutes} min through the night");
-        Add($"  Settings locked from {cfg.NightModeMinutes} min before bedtime until unlock");
-        Add($"  End date: {(cfg.EndDate is { } ed ? $"last night is {ed}, then NightGuard removes itself" : "none")}");
-        Add();
-        Add("\U0001F4AC  YOUR WHY AND JOURNAL");
-        Add(cfg.Why.Length > 0 ? $"  \"{cfg.Why}\"" : "  (no reason written; we recommend one!)");
-        Add($"  Morning check-in, streaks and badges: {(cfg.MorningCheckIn ? "on" : "off")}");
-        Add();
-        Add("\U0001F3AE  GAME AND SCREEN TIME");
+        ReviewCards.Children.Add(ReviewCard("⏰", "Warnings", 3, [.. warn]));
+
+        // At bedtime
+        var (ae, an, _, _) = ActionInfo.TryGetValue(cfg.Action, out var info) ? info : ("\U0001F319", cfg.Action, 0, "");
+        var act = new List<UIElement>
+        {
+            new TextBlock { Text = $"{ae}  {an}", FontSize = 24, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 6), Foreground = Res("NgMoon") },
+            Line($"After a {Seconds(cfg.CountdownSeconds)} countdown"),
+            Line($"Again every {cfg.RecheckMinutes} min if the PC comes back on"),
+            Line(cfg.NightModeMinutes > 0 ? $"Settings lock {Minutes(cfg.NightModeMinutes)} before bedtime" : "No night mode"),
+        };
+        if (ScheduleMath.EndDate(cfg) is { } end) act.Add(Line($"Ends after {end:d MMM yyyy}"));
+        ReviewCards.Children.Add(ReviewCard("\U0001F319", "At bedtime", 4, [.. act]));
+
+        // Game and screen time
         var st = cfg.ScreenTime;
-        if (st.Enabled)
-        {
-            static string F(int m) => m <= 0 ? "no limit" : NightGuard.Core.ScreenTime.ScreenTimeEngine.FormatMinutes(m);
-            Add($"  Games : {F(st.GameMinutesWeekday)} weekdays, {F(st.GameMinutesWeekend)} weekends");
-            Add($"  Screen: {F(st.ScreenMinutesWeekday)} weekdays, {F(st.ScreenMinutesWeekend)} weekends, then {st.LimitAction}");
-            Add($"  New day starts at {st.ResetHour}:00");
-        }
-        else Add("  off");
-        Add();
-        Add("\U0001F6AB  BLOCKING");
+        static string F(int m) => m <= 0 ? "no limit" : NightGuard.Core.ScreenTime.ScreenTimeEngine.FormatMinutes(m);
+        UIElement[] screen = st.Enabled
+            ? [Line($"Games: {F(st.GameMinutesWeekday)} weekdays, {F(st.GameMinutesWeekend)} weekends", strong: true),
+               Line($"Screen: {F(st.ScreenMinutesWeekday)} weekdays, {F(st.ScreenMinutesWeekend)} weekends"),
+               Line($"Then: {st.LimitAction}. New day at {st.ResetHour}:00.")]
+            : [Line("Off")];
+        ReviewCards.Children.Add(ReviewCard("\U0001F3AE", "Game and screen time", 5, screen));
+
+        // Blocking
         var b = cfg.Blocking;
+        var block = new List<UIElement>();
         if (b.Enabled)
         {
-            Add($"  {b.Sites.Count} sites, {b.Apps.Count} apps/folders");
-            if (b.DuringBedtime) Add("  during bedtime hours");
-            foreach (var w in b.Windows) Add($"  {string.Join(" ", w.Days)}: {TimeText.Format(w.From)} to {TimeText.Format(w.To)}");
+            block.Add(Line($"{b.Sites.Count} sites, {b.Apps.Count} apps or folders", strong: true));
+            if (b.DuringBedtime) block.Add(Line("During bedtime hours"));
+            foreach (var w in b.Windows) block.Add(Line($"{string.Join(" ", w.Days)}: {TimeText.Format(w.From)} to {TimeText.Format(w.To)}"));
         }
-        else Add("  off");
-        Add();
-        Add("\U0001F510  TRUSTED PERSON");
-        Add(TrustedOn ? "  ON, saving needs the code" : TrustCheck.IsChecked == true ? $"  ON: your trusted person sets the code when you click {SaveButton.Content}" : "  off");
+        else block.Add(Line("Off"));
+        ReviewCards.Children.Add(ReviewCard("\U0001F6AB", "Blocking", 6, [.. block]));
+
+        // Trusted person
+        ReviewCards.Children.Add(ReviewCard("\U0001F510", "Trusted person", 7, Line(TrustedOn
+            ? "On: saving needs the code"
+            : TrustCheck.IsChecked == true ? $"On: your trusted person sets the code when you click {SaveButton.Content}" : "Off", strong: TrustedOn || TrustCheck.IsChecked == true)));
 
         ConfirmCheck.IsEnabled = errs.Count == 0;
-        ReviewBox.Text = sb.ToString();
 
         // Show what the service will treat as looser than now
         if (Configured && errs.Count == 0 && _serviceError is null)
@@ -721,11 +1238,9 @@ public partial class MainWindow : Window
             var check = await ServiceClient.SendAsync(new IpcRequest { Op = Ops.CheckSave, Config = cfg });
             if (check.Ok && check.Loosening is { Count: > 0 } loose)
             {
-                var head = new StringBuilder();
-                head.AppendLine(TrustedOn ? "\U0001F513 LOOSER THAN NOW (allowed with the trusted person's code):" : "\U0001F6A7 LOOSER THAN NOW (needs the 7-day cool-off, or undo these):");
-                foreach (var l in loose) head.AppendLine("  - " + l);
-                head.AppendLine();
-                ReviewBox.Text = head + ReviewBox.Text;
+                LooseCard.Visibility = Visibility.Visible;
+                LooseTitle.Text = TrustedOn ? "\U0001F513 Looser than now (allowed with the trusted person's code)" : "\U0001F6A7 Looser than now (needs the 7-day cool-off, or undo these)";
+                LooseText.Text = string.Join("\n", loose.Select(l => "•  " + l));
             }
         }
     }
@@ -792,6 +1307,7 @@ public partial class MainWindow : Window
             if (!h.Ok) Ask.Warn(this, h.Error ?? "Hibernate couldn't be turned on.");
         }
 
+        var firstStart = !Configured;
         var req = new IpcRequest { Op = Ops.Save, Config = cfg, Code = code, EnableTrusted = newCode is not null, NewCode = newCode, Contact = ContactBox.Text.Trim() };
         var r = await RunAsync(req);
 
@@ -830,7 +1346,11 @@ public partial class MainWindow : Window
         if (newCode is not null) done += "\n\nTrusted-person mode is on. From now on, changes and uninstall need the trusted person's code.";
         Steps.SelectedIndex = 0;
         await ReloadAsync();
-        Ask.Happy(this, done);
+        // Party time
+        Confetti.Burst(Root);
+        Confetti.Burst(Root, new Point(Root.ActualWidth / 2, Root.ActualHeight * 0.6), 120);
+        await Task.Delay(firstStart ? 1800 : 900);
+        Ask.Happy(this, firstStart ? "NightGuard is on duty! \U0001F989\n\n" + done : done);
     }
 
     private async void Discard_Click(object sender, RoutedEventArgs e) => await ReloadAsync();

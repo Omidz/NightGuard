@@ -35,7 +35,7 @@ internal sealed class Agent : IDisposable
         {
             while (!_cts.IsCancellationRequested)
             {
-                if (_showEvent.WaitOne(1000)) _app.Dispatcher.BeginInvoke(OpenMain);
+                if (_showEvent.WaitOne(1000)) _app.Dispatcher.BeginInvoke(() => OpenMain());
             }
         }) { IsBackground = true, Name = "show-window" };
         showThread.Start();
@@ -93,18 +93,19 @@ internal sealed class Agent : IDisposable
         _tray.Text = text.Length > 63 ? text[..63] : text;
     }
 
-    public void OpenMain()
+    public MainWindow? OpenMain()
     {
         if (_main is { IsLoaded: true })
         {
             if (_main.WindowState == WindowState.Minimized) _main.WindowState = WindowState.Normal;
             _main.Activate();
-            return;
+            return _main;
         }
         _main = new MainWindow();
         _main.Closed += (_, _) => { _main = null; App.TrimMemory(); };
         _main.Show();
         _main.Activate();
+        return _main;
     }
 
     // ---------------------------------------------------------------- events from the service
@@ -181,7 +182,7 @@ internal sealed class Agent : IDisposable
         var r = await ServiceClient.SendAsync(Ops.CheckIn).ConfigureAwait(true);
         if (r.CheckIn is not { Show: true } info) return;
         _checkInOpen = true;
-        var w = new CheckInWindow(info);
+        var w = new CheckInWindow(info, () => OpenMain()?.StartCommitAgain());
         w.Closed += (_, _) => { _checkInOpen = false; App.TrimMemory(); };
         w.Show();
     }
