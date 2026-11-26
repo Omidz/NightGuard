@@ -1126,12 +1126,11 @@ $bJournal.Add_Click({ Safe { Show-JournalDialog } })
 
 function Invoke-Preview([string]$Script, [string[]]$ScriptArgs, $Cfg = $null) {
     if (-not $Cfg) { $Cfg = Read-Form }
-    # Preview with the settings currently on screen
-    $tmp = Join-Path $env:TEMP 'nightguard-preview'
-    New-Item -ItemType Directory -Force -Path $tmp | Out-Null
-    Copy-Item (Join-Path $PSScriptRoot 'common.ps1'), (Join-Path $PSScriptRoot $Script) -Destination $tmp -Force
-    Set-Content -Path (Join-Path $tmp 'config.json') -Value (ConvertTo-NGJson $Cfg) -Encoding UTF8
-    Start-Process powershell.exe -ArgumentList (@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', "`"$(Join-Path $tmp $Script)`"") + $ScriptArgs)
+    # Preview with the settings currently on screen. Only the settings go to TEMP; the
+    # scripts always run from here (TEMP is writable without admin rights, and this app runs as admin)
+    $tmp = Join-Path $env:TEMP 'nightguard-preview.json'
+    Set-Content -Path $tmp -Value (ConvertTo-NGJson $Cfg) -Encoding UTF8
+    Start-Process powershell.exe -ArgumentList (@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', "`"$(Join-Path $PSScriptRoot $Script)`"") + $ScriptArgs + @('-ConfigPath', "`"$tmp`""))
 }
 $bPrevCd.Add_Click({ Safe { Invoke-Preview 'session.ps1' @('-Preview') } })
 foreach ($wb in $warnPrev) {

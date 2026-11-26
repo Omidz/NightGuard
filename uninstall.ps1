@@ -15,6 +15,9 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common.ps1')
 
+# The code is only ever digits; anything else must not reach the elevated command line
+if ($Code -and $Code -notmatch '^\s*\d{1,12}\s*$') { Write-Host 'The code must be digits only.' -ForegroundColor Red; exit 1 }
+
 $me = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
 if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Host 'Asking for administrator rights...'

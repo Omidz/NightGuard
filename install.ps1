@@ -14,6 +14,9 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common.ps1')
 
 # --- Re-launch elevated if needed -------------------------------------------
+# The code is only ever digits; anything else must not reach the elevated command line
+if ($Code -and $Code -notmatch '^\s*\d{1,12}\s*$') { Write-Host 'The code must be digits only.' -ForegroundColor Red; exit 1 }
+
 $me = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
 if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Host 'Asking for administrator rights...'
@@ -76,6 +79,13 @@ try {
     $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 
     # --- Copy scripts to a folder only admins can change ---------------------
+    # Any user may create folders in ProgramData. A NightGuard folder that exists
+    # without any settings in it wasn't made by this installer (a user could have
+    # pre-created it to own it and keep write access), so start it fresh.
+    if ((Test-Path $NGDir) -and -not $current) {
+        $owner = try { (Get-Acl $NGDir).GetOwner([Security.Principal.SecurityIdentifier]).Value } catch { '' }
+        if ($owner -ne 'S-1-5-32-544' -and $owner -ne 'S-1-5-18') { Remove-NGFolder $NGDir }
+    }
     New-Item -ItemType Directory -Force -Path $NGDir | Out-Null
     $src = (Resolve-Path $PSScriptRoot).Path.TrimEnd('\')
     if ($src -ne $NGDir.TrimEnd('\')) {
@@ -90,6 +100,23 @@ try {
     # SYSTEM + Administrators: full control. Users: read/execute only.
     & icacls.exe $NGDir /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "icacls failed with exit code $LASTEXITCODE" }
+    & icacls.exe $NGDir /setowner '*S-1-5-32-544' | Out-Null   # the owner can always change permissions
+
+    # --- Pin the time zone (see Get-NGNow). Changing it later counts as loosening.
+    $localZone = [TimeZoneInfo]::Local.Id
+    $pinned = Get-NGPinnedZone
+    if (-not $pinned) {
+        Set-Content -Path $NGZoneFile -Value $localZone -Encoding ASCII
+    } elseif ($pinned.Id -ne $localZone) {
+        if ($codeOk -or (Get-NGUnlock).State -eq 'Open') {
+            Set-Content -Path $NGZoneFile -Value $localZone -Encoding ASCII
+            Write-NGLog "time zone changed from $($pinned.Id) to $localZone"
+            if (-not $codeOk) { $usedUnlock = $true }
+        } else {
+            Write-Host "NightGuard keeps using $($pinned.Id) time. To switch to $localZone, request an unlock first (or use the trusted person's code)." -ForegroundColor Yellow
+            Write-NGLog "time zone is $localZone but NightGuard keeps $($pinned.Id) (changing it needs an unlock)"
+        }
+    }
 
     # Morning check-in journal: each user gets a private subfolder (only they, SYSTEM and admins can read it)
     if (-not (Test-Path $NGSinceFile)) { Set-Content -Path $NGSinceFile -Value (Get-Date).ToString('yyyy-MM-dd') -Encoding ASCII }
@@ -122,6 +149,16 @@ try {
     }
     $boot  = New-ScheduledTaskTrigger -AtStartup
     $logon = New-ScheduledTaskTrigger -AtLogOn
+    # Wake-up from sleep / hibernate: check right away (back to bed at night; in the
+    # daytime, cancel a bedtime shutdown left pending from before the sleep)
+    $resume = @()
+    try {
+        $cls = Get-CimClass -ClassName MSFT_TaskEventTrigger -Namespace 'Root/Microsoft/Windows/TaskScheduler'
+        $q = '<QueryList><Query Id="0" Path="System"><Select Path="System">' +
+             '*[System[Provider[@Name=''Microsoft-Windows-Power-Troubleshooter''] and EventID=1]]</Select>' +
+             '<Select Path="System">*[System[Provider[@Name=''Microsoft-Windows-Kernel-Power''] and EventID=107]]</Select></Query></QueryList>'
+        $resume += New-CimInstance -CimClass $cls -ClientOnly -Property @{ Enabled = $true; Subscription = $q }
+    } catch { Write-NGLog "resume trigger not available: $($_.Exception.Message)" }
 
     $system = New-ScheduledTaskPrincipal -UserId 'NT AUTHORITY\SYSTEM' -LogonType ServiceAccount -RunLevel Highest
     $usersGroup = (New-Object Security.Principal.SecurityIdentifier 'S-1-5-32-545').Translate([Security.Principal.NTAccount]).Value
@@ -140,7 +177,7 @@ try {
     }
     if ($cfg.Action -eq 'Shutdown') { $sysSettingsArgs.WakeToRun = $true }
     Register-ScheduledTask -TaskPath $NGTaskPath -TaskName 'Enforce bedtime' `
-        -Action (New-NGAction 'enforce.ps1') -Trigger (@($nightTriggers) + $boot + $logon) -Principal $system `
+        -Action (New-NGAction 'enforce.ps1') -Trigger (@($nightTriggers) + $boot + $logon + $resume) -Principal $system `
         -Settings (New-ScheduledTaskSettingsSet @sysSettingsArgs) `
         -Description 'Enforces the bedtime action during locked nights. Installed by NightGuard.' | Out-Null
 
