@@ -94,7 +94,8 @@ jobs:
             🌙 **NightGuard ${{ steps.version.outputs.version }}**, your bedtime bouncer.
 
             Download **NightGuard.msi** below, double-click it, and follow the setup. Needs 64-bit Windows 10 or 11.
-            Windows says "Windows protected your PC"? Click **More info** > **Run anyway** (the installer isn't code-signed yet).
+            Windows says "Windows protected your PC"? Click **More info** > **Run anyway** (the installer isn't code-signed).
+            Smart App Control on? Setup shows you how to turn it off first, because it blocks apps that aren't code-signed.
 
             See the [README](https://github.com/Omidz/NightGuard#readme) for what it does and how the self-lock works.
           files: out/msi/NightGuard.msi
