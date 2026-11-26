@@ -5,7 +5,7 @@ using NightGuard.Core.Schedule;
 
 namespace NightGuard.Core.Config;
 
-/// <summary>Checks a config. An empty list means it's fine. Same rules as the PowerShell version.</summary>
+/// <summary>Checks a config. An empty list means it's fine.</summary>
 public static partial class ConfigValidator
 {
     [GeneratedRegex(@"^[\w .+()\-]{1,100}$")]

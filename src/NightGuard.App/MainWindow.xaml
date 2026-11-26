@@ -25,15 +25,6 @@
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
-        <Style x:Key="ListText" TargetType="TextBox">
-            <Setter Property="AcceptsReturn" Value="True" />
-            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
-            <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
-            <Setter Property="TextWrapping" Value="NoWrap" />
-            <Setter Property="VerticalContentAlignment" Value="Top" />
-        </Style>
     </Window.Resources>
 
     <Grid x:Name="Root">

@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 namespace NightGuard.Core.Config;
 
 /// <summary>
-/// Reads and writes config.json. Reading is forgiving (old versions, hand edits, PowerShell quirks
+/// Reads and writes config.json. Reading is forgiving (hand edits, quirks of files written by NightGuard 1
 /// such as a single string where a list was expected); writing always produces the clean current format.
 /// </summary>
 public static class ConfigSerializer
@@ -31,15 +31,13 @@ public static class ConfigSerializer
         var node = JsonNode.Parse(json, documentOptions: new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip })
                    ?? throw new FormatException("The settings file is empty.");
         if (node is not JsonObject obj) throw new FormatException("The settings file is not a JSON object.");
-        NightGuardConfig cfg;
-        if (obj["Version"] is null && obj["ShutdownTime"] is not null) cfg = ConvertVersion1(obj);
-        else cfg = obj.Deserialize<NightGuardConfig>(ReadOptions) ?? throw new FormatException("The settings file is empty.");
+        var cfg = obj.Deserialize<NightGuardConfig>(ReadOptions) ?? throw new FormatException("The settings file is empty.");
         return Normalize(cfg);
     }
 
     public static string Write(NightGuardConfig cfg) => JsonSerializer.Serialize(Normalize(cfg), WriteOptions);
 
-    /// <summary>Cleans up a config in place (the C# version of the PowerShell ConvertTo-NGJson) and returns it.</summary>
+    /// <summary>Cleans up a config in place (trims, lower-cases sites, drops .exe, sorts) and returns it.</summary>
     public static NightGuardConfig Normalize(NightGuardConfig cfg)
     {
         cfg.Version = 4;
@@ -94,50 +92,6 @@ public static class ConfigSerializer
         return list;
     }
 
-    // Version 1 (Bedtime Lock): one ShutdownTime / UnlockTime for every night and WarnTimes as clock times.
-    private static NightGuardConfig ConvertVersion1(JsonObject old)
-    {
-        var cfg = new NightGuardConfig();
-        var shutdown = (string?)old["ShutdownTime"] ?? "00:00";
-        var unlock = (string?)old["UnlockTime"] ?? "06:00";
-        foreach (var day in Defaults.Days) cfg.Schedule[day] = new NightSchedule { Enabled = true, Bedtime = shutdown, Unlock = unlock };
-        cfg.Warnings = [];
-        if (TimeSpan.TryParse(shutdown, CultureInfo.InvariantCulture, out var bt) && old["WarnTimes"] is JsonArray warn)
-        {
-            foreach (var t in warn)
-            {
-                if (!TimeSpan.TryParse((string?)t, CultureInfo.InvariantCulture, out var wt)) continue;
-                var m = (int)(bt - wt).TotalMinutes;
-                if (m <= 0) m += 1440;
-                cfg.Warnings.Add(new WarningSetting { MinutesBefore = m, Sound = true, Message = m <= 5 ? Defaults.Warning5 : Defaults.Warning30 });
-            }
-        }
-        cfg.EndDate = (string?)old["EndDate"];
-        return cfg;
-    }
-
-    /// <summary>Turns the old separate Screen Limits add-on's config into a ScreenTime section (turned on).</summary>
-    public static ScreenTimeSettings ConvertScreenLimits(string json)
-    {
-        var old = JsonNode.Parse(json) as JsonObject ?? throw new FormatException("Not a Screen Limits config.");
-        var st = new ScreenTimeSettings();
-        var tmp = old.Deserialize<ScreenTimeSettings>(ReadOptions) ?? new ScreenTimeSettings();
-        if (old["ResetHour"] is not null) st.ResetHour = tmp.ResetHour;
-        if (old["GameMinutesWeekday"] is not null) st.GameMinutesWeekday = tmp.GameMinutesWeekday;
-        if (old["GameMinutesWeekend"] is not null) st.GameMinutesWeekend = tmp.GameMinutesWeekend;
-        if (old["ScreenMinutesWeekday"] is not null) st.ScreenMinutesWeekday = tmp.ScreenMinutesWeekday;
-        if (old["ScreenMinutesWeekend"] is not null) st.ScreenMinutesWeekend = tmp.ScreenMinutesWeekend;
-        if (old["WarnAtMinutesLeft"] is not null) st.WarnAtMinutesLeft = tmp.WarnAtMinutesLeft;
-        if (old["ShutdownGraceMinutes"] is not null) st.ShutdownGraceMinutes = tmp.ShutdownGraceMinutes;
-        if (old["GameFolders"] is not null) st.GameFolders = tmp.GameFolders;
-        if (old["GameProcesses"] is not null) st.GameProcesses = tmp.GameProcesses;
-        if (old["IgnoreProcesses"] is not null) st.IgnoreProcesses = tmp.IgnoreProcesses;
-        if (old["LauncherProcesses"] is not null) st.LauncherProcesses = tmp.LauncherProcesses;
-        if ((string?)old["ScreenLimitAction"] is { Length: > 0 } a) st.LimitAction = a;
-        if (old["CloseLaunchersWhenGameLimitHit"] is JsonValue v && v.TryGetValue<bool>(out var cl)) st.CloseLaunchers = cl;
-        st.Enabled = true;
-        return st;
-    }
 }
 
 /// <summary>Accepts a list, a single string, or null for a list of strings.</summary>

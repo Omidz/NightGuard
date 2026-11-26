@@ -150,7 +150,6 @@ public static class AgentEventKinds
     public const string Notice = "notice";
     public const string CheckIn = "checkIn";
     public const string Exit = "exit";
-    public const string Ping = "ping";
 }
 
 public sealed class AgentEvent

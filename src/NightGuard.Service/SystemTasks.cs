@@ -141,8 +141,7 @@ internal static class SystemTasks
 
     /// <summary>
     /// Upgrading from the PowerShell version: its scheduled tasks and scripts go, its settings, code,
-    /// unlock request, streak and journals stay (same files). Bedtime Lock and Screen Limits (older
-    /// names) are folded in the same way. Returns true if anything was migrated.
+    /// unlock request, streak and journals stay (same files). Returns true if anything was migrated.
     /// </summary>
     public static bool MigrateOldVersions(Store store)
     {
@@ -178,41 +177,6 @@ internal static class SystemTasks
                 migrated = true;
             }
             catch (Exception e) { store.Log($"pinned time zone could not be carried over: {e.Message}"); }
-        }
-
-        var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-        var legacyDir = Path.Combine(programData, "BedtimeLock");
-        if (Directory.Exists(legacyDir))
-        {
-            var legacyConfig = Path.Combine(legacyDir, "config.json");
-            if (!store.HasConfig && File.Exists(legacyConfig))
-            {
-                try { store.WriteConfig(ConfigSerializer.Read(File.ReadAllText(legacyConfig))); } catch (Exception e) { store.Log($"old Bedtime Lock settings could not be read: {e.Message}"); }
-            }
-            DeleteTaskFolder("BedtimeLock");
-            foreach (var n in new[] { "Bedtime Lock.lnk", "Bedtime Lock (text menu).lnk" }) Store.TryDelete(Path.Combine(CommonPrograms, n));
-            try { Directory.Delete(legacyDir, true); } catch { }
-            store.Log("old Bedtime Lock install migrated and removed");
-            migrated = true;
-        }
-
-        var slDir = Path.Combine(programData, "ScreenLimits");
-        if (Directory.Exists(slDir))
-        {
-            var slConfig = Path.Combine(slDir, "config.json");
-            if (File.Exists(slConfig) && store.ReadConfig(out _) is { } cfg && !cfg.ScreenTime.Enabled)
-            {
-                try
-                {
-                    cfg.ScreenTime = ConfigSerializer.ConvertScreenLimits(File.ReadAllText(slConfig));
-                    store.WriteConfig(cfg);
-                }
-                catch (Exception e) { store.Log($"old Screen Limits settings could not be read: {e.Message}"); }
-            }
-            DeleteTaskFolder("ScreenLimits");
-            try { Directory.Delete(slDir, true); } catch { }
-            store.Log("old Screen Limits add-on migrated and removed");
-            migrated = true;
         }
         return migrated;
     }

@@ -35,6 +35,8 @@ internal sealed class AgentHub(Store store)
 
     public bool HasAgent(int sessionId) => _agents.Values.Any(a => a.SessionId == sessionId);
 
+    public int SubscriptionCount(int sessionId) => _agents.Values.Count(a => a.SessionId == sessionId);
+
     /// <summary>Holds a subscribed connection open until it closes.</summary>
     public async Task RunSubscriptionAsync(PipeStream pipe, int sessionId, CancellationToken ct)
     {

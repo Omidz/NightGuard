@@ -69,7 +69,6 @@ public static class Defaults
         @"Bedtime in {minutes} minutes.\n\nThe PC will {action} at {bedtime} and stays locked until {unlock}.\n\nFinish your match, save your work, and start winding down.";
     public const string Warning5 =
         @"FINAL WARNING\n\nThe PC will {action} at {bedtime} (about {minutes} min).\n\nSave your work and quit your game NOW.";
-    public const string WarningGeneric = "Bedtime in {minutes} minutes. The PC will {action} at {bedtime}.";
 
     public static readonly (int MinMinutes, string Message)[] WarningExamples =
     [
