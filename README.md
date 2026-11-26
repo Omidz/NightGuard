@@ -278,7 +278,7 @@ NightGuard 2 is written in C# (.NET 10) and has three parts:
 
 The service and the app talk over a local named pipe that only signed-in users can use. Settings are saved in `C:\ProgramData\NightGuard\config.json`, with a log in `log.txt` next to it (also under **Status and log** in the app). The format is the same as the PowerShell version's, so upgrades carry everything over.
 
-Source layout: `src/NightGuard.Core` (all the rules, unit tested), `src/NightGuard.Service`, `src/NightGuard.App`, `installer/` (WiX), `tests/`. The original PowerShell version is kept in `legacy/` for reference.
+Source layout: `src/NightGuard.Core` (all the rules, unit tested), `src/NightGuard.Service`, `src/NightGuard.App`, `installer/` (WiX), `tests/`.
 
 **Upgrading from the PowerShell version, "Bedtime Lock" or the separate "Screen Limits" tool?** Just install the MSI. It carries over your settings (and today's usage) and removes the old versions.
 

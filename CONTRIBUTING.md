@@ -30,4 +30,3 @@ By opening a pull request, you agree that Omid may use, change and publish your 
 - `src/NightGuard.Service`: the Windows service. `Engine.cs` is the tick loop, `Requests.cs` handles what the app asks for.
 - `src/NightGuard.App`: the WPF app (settings window and tray app).
 - `installer/Product.wxs`: the WiX installer.
-- `legacy/`: the original PowerShell version, for reference only.
