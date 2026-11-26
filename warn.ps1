@@ -1,17 +1,18 @@
 # NightGuard - warning popup. Runs in the signed-in user's session.
 # Picks the warning whose "minutes before bedtime" matches now.
 # -Preview -Index N shows warning N (1-based) right away.
-param([switch]$Preview, [int]$Index = 1)
+# -ConfigPath: preview with these settings instead of the installed ones.
+param([switch]$Preview, [int]$Index = 1, [string]$ConfigPath = '')
 
 Add-Type -AssemblyName System.Windows.Forms
 . (Join-Path $PSScriptRoot 'common.ps1')
 
-$cfgPath = Join-Path $PSScriptRoot 'config.json'
+$cfgPath = if ($Preview -and $ConfigPath) { $ConfigPath } else { Join-Path $PSScriptRoot 'config.json' }
 try { $cfg = if (Test-Path $cfgPath) { Read-NGConfigFile $cfgPath } else { New-NGDefaultConfig } } catch { exit 0 }
 $warnings = @($cfg.Warnings | Where-Object { $_ })
 if ($warnings.Count -eq 0) { exit 0 }
 
-$now = Get-Date
+$now = Get-NGNow
 if ($Preview) {
     $night = Get-NGNextNight $cfg $now
     if (-not $night) { $night = Get-NGNight $cfg $now -IgnoreEndDate }
@@ -58,5 +59,17 @@ $form.AcceptButton = $ok
 $need = [System.Windows.Forms.TextRenderer]::MeasureText($text, $lbl.Font, (New-Object System.Drawing.Size(512, 2000)), [System.Windows.Forms.TextFormatFlags]::WordBreak).Height
 if ($need -gt 170) { $extra = [math]::Min(300, $need - 170); $lbl.Height += $extra; $ok.Top += $extra; $form.Height += $extra }
 Enable-NGStayOnTop $form
+if (-not $Preview) {
+    # Close by itself once bedtime arrives (the countdown takes over from there), or when
+    # the PC wakes up from a sleep: no stale "bedtime is coming" the next morning.
+    $script:lastTick = [datetime]::UtcNow
+    $auto = New-Object System.Windows.Forms.Timer -Property @{ Interval = 2000 }
+    $auto.Add_Tick({
+        $t = [datetime]::UtcNow
+        if (($t - $script:lastTick).TotalSeconds -gt 15 -or (Get-NGNow) -ge $night.Start) { $auto.Stop(); $form.Close(); return }
+        $script:lastTick = $t
+    })
+    $form.Add_Shown({ $auto.Start() })
+}
 [void]$form.ShowDialog()
 $form.Dispose()

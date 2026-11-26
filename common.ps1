@@ -79,6 +79,66 @@ function Test-NGSafeMode {
 function Get-NGDayKey([datetime]$Date) { return $NGDays[(([int]$Date.DayOfWeek) + 6) % 7] }
 
 # ============================================================================
+# NightGuard's clock
+#  - The time zone is pinned when NightGuard is installed (timezone.txt). Any user
+#    can change the Windows time zone without admin rights, so without the pin,
+#    "moving to Hawaii" at 23:59 would push bedtime hours later.
+#  - Get-NGNow is the time in the pinned zone (daylight saving still works).
+#  - Wait-NGSeconds waits by the wall clock and notices a sleep / hibernate /
+#    clock jump in the middle, so a countdown started last night never acts
+#    when the PC is resumed the next day.
+# ============================================================================
+$NGZoneFile = Join-Path $NGDir 'timezone.txt'
+
+function Get-NGPinnedZone {
+    try {
+        if (Test-Path $NGZoneFile) {
+            $id = "$(Get-Content $NGZoneFile -TotalCount 1)".Trim()
+            if ($id) { return [TimeZoneInfo]::FindSystemTimeZoneById($id) }
+        }
+    } catch { }
+    return $null
+}
+
+function Get-NGNow {
+    [TimeZoneInfo]::ClearCachedData()   # notice a time zone change while a script is running
+    $z = Get-NGPinnedZone
+    if ($z -and $z.Id -ne [TimeZoneInfo]::Local.Id) {
+        return [datetime]::SpecifyKind([TimeZoneInfo]::ConvertTimeFromUtc([datetime]::UtcNow, $z), 'Unspecified')
+    }
+    return (Get-Date)
+}
+
+# Waits $Seconds. Returns $false as soon as the wall clock jumps more than
+# $MaxGap seconds between two half-second checks (the PC slept, hibernated, or
+# the clock was changed): whatever was waiting is stale and must not act.
+function Wait-NGSeconds([double]$Seconds, [double]$MaxGap = 10) {
+    $start = [datetime]::UtcNow
+    $prev = $start
+    while (([datetime]::UtcNow - $start).TotalSeconds -lt $Seconds) {
+        Start-Sleep -Milliseconds 500
+        $t = [datetime]::UtcNow
+        $gap = ($t - $prev).TotalSeconds
+        if ($gap -gt $MaxGap -or $gap -lt -1) { return $false }
+        $prev = $t
+    }
+    return $true
+}
+
+# Marks that a NightGuard bedtime shutdown is pending (shutdown /s /t N). If the PC
+# was put to sleep or hibernated during that countdown, Windows can finish the
+# shutdown after the resume. Outside bedtime, enforce.ps1 and blocker.ps1 cancel it.
+$NGShutdownMark = Join-Path $NGDir 'shutdown-pending.txt'
+
+function Clear-NGStaleShutdown {
+    if (-not (Test-Path $NGShutdownMark)) { return }
+    & "$env:SystemRoot\System32\shutdown.exe" /a 2>$null | Out-Null
+    $code = $LASTEXITCODE
+    Remove-Item $NGShutdownMark -Force -ErrorAction SilentlyContinue
+    if ($code -eq 0) { Write-NGLog 'bedtime is over: cancelled a leftover bedtime shutdown' }
+}
+
+# ============================================================================
 # Config
 # ============================================================================
 function New-NGDefaultBlocking {
@@ -438,18 +498,18 @@ function Get-NGNight($Cfg, [datetime]$Evening, [switch]$IgnoreEndDate) {
     return [pscustomobject]@{ Day = $key; Evening = $Evening.Date; Start = $start; End = $stop }
 }
 
-function Get-NGNights($Cfg, [datetime]$Now = (Get-Date)) {
+function Get-NGNights($Cfg, [datetime]$Now = (Get-NGNow)) {
     foreach ($i in -1..7) {
         $n = Get-NGNight $Cfg ($Now.Date.AddDays($i))
         if ($n) { $n }
     }
 }
 
-function Get-NGCurrentNight($Cfg, [datetime]$Now = (Get-Date)) {
+function Get-NGCurrentNight($Cfg, [datetime]$Now = (Get-NGNow)) {
     return (Get-NGNights $Cfg $Now | Where-Object { $Now -ge $_.Start -and $Now -lt $_.End } | Select-Object -First 1)
 }
 
-function Get-NGNextNight($Cfg, [datetime]$Now = (Get-Date)) {
+function Get-NGNextNight($Cfg, [datetime]$Now = (Get-NGNow)) {
     return (Get-NGNights $Cfg $Now | Where-Object { $_.Start -gt $Now } | Sort-Object Start | Select-Object -First 1)
 }
 
@@ -464,14 +524,14 @@ function Get-NGExpiry($Cfg) {
 
 function Test-NGExpired($Cfg) {
     $x = Get-NGExpiry $Cfg
-    return ($null -ne $x) -and ((Get-Date) -ge $x)
+    return ($null -ne $x) -and ((Get-NGNow) -ge $x)
 }
 
 # Returns a message if settings changes / uninstall are blocked right now, else $null.
 function Get-NGBlockedReason($Cfg) {
     if (-not $Cfg) { return $null }
     if (Test-NGExpired $Cfg) { return $null }
-    $now = Get-Date
+    $now = Get-NGNow
     foreach ($n in (Get-NGNights $Cfg $now)) {
         $from = $n.Start.AddMinutes(-[int]$Cfg.NightModeMinutes)
         if ($now -ge $from -and $now -lt $n.End) {
@@ -491,7 +551,7 @@ function Format-NGMessage([string]$Text, $Cfg, $Night, [int]$Minutes) {
 }
 
 # Is site/app blocking active at $Now?
-function Test-NGBlockActive($Cfg, [datetime]$Now = (Get-Date)) {
+function Test-NGBlockActive($Cfg, [datetime]$Now = (Get-NGNow)) {
     $b = $Cfg.Blocking
     if (-not $b -or -not $b.Enabled) { return $false }
     if ($b.DuringBedtime -and (Get-NGCurrentNight $Cfg $Now)) { return $true }
@@ -645,7 +705,7 @@ $NGNeverKill = @('explorer', 'dwm', 'csrss', 'winlogon', 'wininit', 'lsass', 'se
                  'taskmgr', 'powershell', 'pwsh', 'cmd', 'conhost', 'sihost', 'fontdrvhost', 'ctfmon', 'runtimebroker',
                  'searchhost', 'startmenuexperiencehost', 'shellexperiencehost', 'textinputhost', 'audiodg', 'msmpeng', 'securityhealthsystray')
 
-function Get-NGUsageDay($St, [datetime]$Now = (Get-Date)) { return $Now.AddHours(-[int]$St.ResetHour).Date }
+function Get-NGUsageDay($St, [datetime]$Now = (Get-NGNow)) { return $Now.AddHours(-[int]$St.ResetHour).Date }
 
 function Get-NGLimits($St, [datetime]$Day) {
     $weekend = ($Day.DayOfWeek -eq 'Saturday' -or $Day.DayOfWeek -eq 'Sunday')
@@ -769,7 +829,7 @@ function Assert-NGCode([string]$Code) {
     $state = Get-NGState
     if ($state.LockedUntil) {
         $until = if ($state.LockedUntil -is [datetime]) { $state.LockedUntil } else { [datetime]::Parse([string]$state.LockedUntil, $NGInv) }
-        if ((Get-Date) -lt $until) { throw ("Too many wrong codes. Try again after {0:HH\:mm} ({0:ddd})." -f $until) }
+        if ((Get-NGNow) -lt $until) { throw ("Too many wrong codes. Try again after {0:HH\:mm} ({0:ddd})." -f $until) }
     }
     if ([string]::IsNullOrWhiteSpace($Code)) { throw "This needs the trusted person's code." }
     $hash = Get-NGCodeHash $Code ([Convert]::FromBase64String($t.Salt)) ([int]$t.Iterations) ([string]$t.Alg)
@@ -783,7 +843,7 @@ function Assert-NGCode([string]$Code) {
     if ($fails -ge 5) {
         # 15 min after 5 wrong codes, doubling each time after that, up to 24 hours
         $mins = [math]::Min(1440, 15 * [math]::Pow(2, $fails - 5))
-        $lock = (Get-Date).AddMinutes($mins).ToString('s')
+        $lock = (Get-NGNow).AddMinutes($mins).ToString('s')
     }
     Save-NGState ([pscustomobject]@{ FailedAttempts = $fails; LockedUntil = $lock })
     Write-NGLog "wrong trusted-person code (attempt $fails)"
@@ -812,7 +872,7 @@ function Get-NGUnlock {
         $u = Get-Content $NGUnlockFile -Raw | ConvertFrom-Json
         $req = if ($u.RequestedAt -is [datetime]) { $u.RequestedAt } else { [datetime]::ParseExact([string]$u.RequestedAt, 's', $NGInv) }
     } catch { return $none }
-    $now = Get-Date
+    $now = Get-NGNow
     if ($req -gt $now.AddDays(1)) { return $none }   # requested "in the future": clock was changed, ignore it
     $opens = $req.AddDays($NGCoolOffDays); $closes = $opens.AddDays($NGUnlockOpenDays)
     $state = if ($now -lt $opens) { 'Waiting' } elseif ($now -lt $closes) { 'Open' } else { 'None' }
@@ -821,9 +881,10 @@ function Get-NGUnlock {
 
 function Request-NGUnlock {
     if ((Get-NGUnlock).State -ne 'None') { return }
-    Set-Content -Path $NGUnlockFile -Value (@{ RequestedAt = (Get-Date).ToString('s') } | ConvertTo-Json) -Encoding UTF8
+    $now = Get-NGNow
+    Set-Content -Path $NGUnlockFile -Value (@{ RequestedAt = $now.ToString('s') } | ConvertTo-Json) -Encoding UTF8
     Protect-NGFile $NGUnlockFile
-    Write-NGLog "unlock requested; cool-off ends $((Get-Date).AddDays($NGCoolOffDays).ToString('yyyy-MM-dd HH:mm'))"
+    Write-NGLog "unlock requested; cool-off ends $($now.AddDays($NGCoolOffDays).ToString('yyyy-MM-dd HH:mm'))"
 }
 
 function Clear-NGUnlock([string]$Why = 'cancelled') {
@@ -948,13 +1009,13 @@ function Add-NGSteppedIn([datetime]$Evening) {
 }
 
 function Get-NGSince {
-    try { return [datetime]::ParseExact((Get-Content $NGSinceFile -TotalCount 1).Trim(), 'yyyy-MM-dd', $NGInv) } catch { return (Get-Date).Date }
+    try { return [datetime]::ParseExact((Get-Content $NGSinceFile -TotalCount 1).Trim(), 'yyyy-MM-dd', $NGInv) } catch { return (Get-NGNow).Date }
 }
 
 # How did last night go? Returns $null while a locked night is still running, else
 # an object with Kind = Clean | SteppedIn | Free | New, and the current streak.
-function Get-NGNightReport($Cfg, [datetime]$Now = (Get-Date)) {
-    if (Get-NGCurrentNight $Cfg) { return $null }
+function Get-NGNightReport($Cfg, [datetime]$Now = (Get-NGNow)) {
+    if (Get-NGCurrentNight $Cfg $Now) { return $null }
     $since = Get-NGSince
     $stepped = @(); if (Test-Path $NGSteppedInFile) { $stepped = @(Get-Content $NGSteppedInFile) }
     # Walk every night since install (oldest first): current run and best run of clean nights
@@ -1013,6 +1074,26 @@ function Initialize-NGWin32 {
 [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
 [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
 '@
+}
+
+# Session control for SYSTEM (enforce.ps1): lock or sign out the console session
+# even if the user closed the countdown window or killed its PowerShell.
+function Initialize-NGWts {
+    if ('NGNative.NGWts' -as [type]) { return }
+    Add-Type -Namespace 'NGNative' -Name 'NGWts' -MemberDefinition @'
+[DllImport("kernel32.dll")] public static extern uint WTSGetActiveConsoleSessionId();
+[DllImport("wtsapi32.dll", SetLastError = true)] public static extern bool WTSDisconnectSession(IntPtr server, uint sessionId, bool wait);
+[DllImport("wtsapi32.dll", SetLastError = true)] public static extern bool WTSLogoffSession(IntPtr server, uint sessionId, bool wait);
+'@
+}
+
+# Is someone signed in at the console with the screen unlocked?
+function Test-NGScreenInUse {
+    try {
+        $user = (Get-CimInstance Win32_ComputerSystem).UserName
+        $lockScreen = [bool](Get-Process -Name LogonUI -ErrorAction SilentlyContinue)
+        return ([bool]$user -and -not $lockScreen)
+    } catch { return $false }
 }
 
 # Puts a form on top of everything and gives it focus
@@ -1100,7 +1181,16 @@ function Remove-NightGuard {
         $svc.GetFolder('\').DeleteFolder($NGAppName, 0)
     } catch { }
     Remove-Item -Path $NGShortcut, $NGShortcut2, $NGShortcutDesk -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path $NGDir -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-NGFolder $NGDir
+}
+
+# Deletes a folder tree without following junctions or symlinks inside it.
+# (Windows PowerShell 5.1's Remove-Item -Recurse can delete what a junction points
+# to; a user could plant one in their journal folder and have an admin uninstall
+# wipe something else.) rmdir /s removes the links themselves, never their targets.
+function Remove-NGFolder([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    & "$env:SystemRoot\System32\cmd.exe" /d /c rmdir /s /q $Path 2>$null | Out-Null
 }
 
 # Removes an install of the tool under its old name (Bedtime Lock). Returns its
