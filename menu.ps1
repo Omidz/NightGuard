@@ -241,11 +241,11 @@ function Edit-Warnings($Cfg) {
             { $_ -match '^[pP]$' } {
                 if ($ws.Count -eq 0) { break }
                 $n = Ask-Int 'Preview which warning' 1 1 $ws.Count
-                $tmp = Join-Path $env:TEMP 'nightguard-preview'
-                New-Item -ItemType Directory -Force -Path $tmp | Out-Null
-                Copy-Item (Join-Path $PSScriptRoot 'common.ps1'), (Join-Path $PSScriptRoot 'warn.ps1') -Destination $tmp -Force
-                Set-Content -Path (Join-Path $tmp 'config.json') -Value (ConvertTo-NGJson $Cfg) -Encoding UTF8
-                & (Join-Path $tmp 'warn.ps1') -Preview -Index $n
+                # Only the settings go to TEMP; the scripts always run from here (TEMP is
+                # writable without admin rights, and this menu runs as admin)
+                $tmp = Join-Path $env:TEMP 'nightguard-preview.json'
+                Set-Content -Path $tmp -Value (ConvertTo-NGJson $Cfg) -Encoding UTF8
+                & (Join-Path $PSScriptRoot 'warn.ps1') -Preview -Index $n -ConfigPath $tmp
             }
             '0' { return }
         }
