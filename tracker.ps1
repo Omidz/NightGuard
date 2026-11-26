@@ -52,7 +52,7 @@ try {
     if (Get-NGUnsafeReason $cfg) { exit 0 }
     $st = $cfg.ScreenTime
 
-    $now      = Get-Date
+    $now      = Get-NGNow   # NightGuard's clock (time zone pinned at install)
     $usageDay = Get-NGUsageDay $st $now
     $dayKey   = $usageDay.ToString('yyyy-MM-dd')
     $limits   = Get-NGLimits $st $usageDay
