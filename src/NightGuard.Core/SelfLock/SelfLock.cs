@@ -98,9 +98,12 @@ public static class SelfLockRules
                 if (goneSites.Count > 0) output.Add("sites unblocked: " + string.Join(", ", goneSites));
                 var goneApps = ob.Apps.Where(s => !nb.Apps.Contains(s, StringComparer.OrdinalIgnoreCase)).ToList();
                 if (goneApps.Count > 0) output.Add("apps unblocked: " + string.Join(", ", goneApps));
-                static string Key(BlockWindow w) => $"{string.Join(",", w.Days)}|{w.From}|{w.To}";
-                var newKeys = nb.Windows.Select(Key).ToHashSet();
-                if (ob.Windows.Any(w => !newKeys.Contains(Key(w)))) output.Add("blocking time slots changed or removed");
+                // Compare the minutes of the week each set of time slots covers: adding days or making a
+                // slot longer is stricter; any minute that was blocked and no longer is counts as looser.
+                var before = BlockedMinutes(ob.Windows);
+                var after = BlockedMinutes(nb.Windows);
+                for (var m = 0; m < before.Length; m++)
+                    if (before[m] && !after[m]) { output.Add("blocking time slots cover less time"); break; }
             }
         }
 
@@ -128,6 +131,27 @@ public static class SelfLockRules
             }
         }
         return output;
+    }
+
+    /// <summary>Which minutes of the week (Monday 00:00 = 0) the time slots block.</summary>
+    internal static bool[] BlockedMinutes(IEnumerable<BlockWindow> windows)
+    {
+        const int week = 7 * 1440;
+        var covered = new bool[week];
+        foreach (var w in windows)
+        {
+            if (!ScheduleMath.IsTime(w.From) || !ScheduleMath.IsTime(w.To)) continue;
+            var from = (int)ScheduleMath.ParseTime(w.From).TotalMinutes;
+            var to = (int)ScheduleMath.ParseTime(w.To).TotalMinutes;
+            var length = to > from ? to - from : 1440 - from + to;   // a slot like 22:00-02:00 crosses midnight
+            foreach (var d in w.Days)
+            {
+                var day = Array.IndexOf(Defaults.Days, d);
+                if (day < 0) continue;
+                for (var m = 0; m < length; m++) covered[(day * 1440 + from + m) % week] = true;
+            }
+        }
+        return covered;
     }
 
     private static bool Removed(List<string> before, List<string> after) =>

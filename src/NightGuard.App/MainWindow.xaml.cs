@@ -50,6 +50,7 @@ public partial class MainWindow : Window
     private static readonly string[] ActionOrder = ["Hibernate", "Shutdown", "Sleep", "SignOut", "Lock"];
     private readonly Dictionary<string, TextBlock> _actionLocks = [];
     private string? _savedAction;   // the bedtime action NightGuard is running with (null before setup)
+    private NightGuardConfig? _savedCfg;   // the settings NightGuard is running with (null before setup)
 
     private static readonly Dictionary<string, (string Emoji, string Name, int Strength, string Text)> ActionInfo = new()
     {
@@ -526,6 +527,7 @@ public partial class MainWindow : Window
         }
         LoadForm(cfg);
         _savedAction = Configured ? cfg.Action : null;
+        _savedCfg = Configured ? cfg.Clone() : null;
         UpdateActionLocks();
         TrustCheck.IsChecked = _status?.TrustedEnabled == true;
         ContactBox.Text = _status?.TrustedContact ?? "";
@@ -942,6 +944,10 @@ public partial class MainWindow : Window
     private void OnFormChanged()
     {
         if (_loading || _pages is null) return;
+        var form = ReadForm();
+        // What's looser than what NightGuard runs with now (same rules the service applies when saving)
+        var looser = _savedCfg is null ? [] : NightGuard.Core.SelfLock.SelfLockRules.Loosening(_savedCfg, form);
+        var canLoosen = TrustedOn || _status?.UnlockState == "Open";
         for (var i = 0; i < 7; i++)
         {
             var r = _nights[i];
@@ -952,8 +958,21 @@ public partial class MainWindow : Window
             var hours = ScheduleMath.LockedHours(r.Bed.Value, r.Unlock.Value);
             var text = hours is { } h ? $"\U0001F634 Locked {h:0.#} hours" : "⚠️ Unlock must be after bedtime";
             if (ScheduleMath.ParseTime(r.Bed.Value).TotalHours < 12) text += $" (early {Defaults.DayNames[(i + 1) % 7][..3]})";
+            var day = Defaults.Days[i];
+            var nightLooser = looser.Any(l => l.StartsWith(day + " night", StringComparison.Ordinal));
+            if (nightLooser) text += canLoosen ? " · 🔓 looser than now" : " · 🔒 looser than now (needs the cool-off)";
             r.Note.Text = text;
-            if (hours is null or > 16) r.Note.Foreground = Res("NgRed"); else r.Note.ClearValue(TextBlock.ForegroundProperty);
+            if (hours is null or > 16) r.Note.Foreground = Res("NgRed");
+            else if (nightLooser) r.Note.Foreground = Res("NgOrange");
+            else r.Note.ClearValue(TextBlock.ForegroundProperty);
+        }
+        // Turning a locked night off is looser too
+        for (var i = 0; i < 7; i++)
+        {
+            var r = _nights[i];
+            if (r.On.IsChecked == true || !looser.Contains($"{Defaults.Days[i]} night is no longer locked")) continue;
+            r.Note.Text = canLoosen ? "🔓 Free night (looser than now)" : "🔒 Free night: looser than now (needs the cool-off)";
+            r.Note.Foreground = Res("NgOrange");
         }
         foreach (var w in _warns) w.Body.IsEnabled = w.On.IsChecked == true;
         GameBody.IsEnabled = GameLimitCheck.IsChecked == true;
@@ -965,11 +984,22 @@ public partial class MainWindow : Window
         foreach (var s in _slots) s.Body.IsEnabled = s.On.IsChecked == true;
         if (_pages[PageIndex] != PageReview && ConfirmCheck.IsChecked == true) ConfirmCheck.IsChecked = false;
 
-        var errs = ConfigValidator.Validate(ReadForm());
+        var errs = ConfigValidator.Validate(form);
         if (errs.Count > 0)
         {
             BottomHint.Foreground = Res("NgRed");
             BottomHint.Text = "Fix before saving: " + errs[0] + (errs.Count > 1 ? $" (+{errs.Count - 1} more)" : "");
+        }
+        else if (looser.Count > 0)
+        {
+            BottomHint.Foreground = Res("NgOrange");
+            BottomHint.Text = (canLoosen ? "🔓 Looser than now (allowed: " + (TrustedOn ? "trusted-person code" : "your unlock is open") + "): " : "🚧 Looser than now, so it needs the 7-day cool-off: ")
+                + looser[0] + (looser.Count > 1 ? $" (+{looser.Count - 1} more)" : "");
+        }
+        else if (_savedCfg is not null)
+        {
+            BottomHint.Foreground = Res("NgGreen");
+            BottomHint.Text = "\u2705 Same or stricter than now: this saves right away. You can always make it harder.";
         }
         else
         {
