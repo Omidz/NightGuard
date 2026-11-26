@@ -6,6 +6,9 @@ NightGuard warns you before bedtime, then **powers your PC off** (hibernate by d
 
 > Built for **heavy** procrastinators. If you've ever googled "how to stop gaming at night" *while gaming at night*, hi, welcome, you're among friends.
 
+> [!WARNING]
+> **Use at your own risk.** NightGuard shuts down, hibernates, locks and blocks things on your PC on purpose. It's provided **as is, with no warranty of any kind**, and the author accepts **no responsibility** for lost work, lost game progress, damaged data, a PC that won't behave, or anything else that happens from using it. Save your work, try the [one-night trial](#-not-sure-yet-test-drive-it-first) first, and keep an administrator account you can always [fall back on](#-removing-it-by-hand-last-resort).
+
 ---
 
 ## ✨ What it does
@@ -348,5 +351,7 @@ NightGuard is **source-available** under the [PolyForm Strict License 1.0.0](LIC
 - 🤝 **Contributions welcome:** you may fork it only to send changes back here as a pull request (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 It's not "open source" in the OSI sense, on purpose: it stays free, and it stays Omid's.
+
+**No warranty, no liability.** NightGuard is provided as is, without any warranty. Using it is entirely at your own risk; the author is not responsible for any loss or damage it causes. (The license says the same, in lawyer.)
 
 Now close this tab and go to sleep. 🌙
