@@ -8,6 +8,9 @@
     the trusted person's code), or after its end date. A plain "Uninstall" is refused with a pointer to
     the app. Administrators can still force it (see the README, "Removing it by hand").
   - Data (settings, journal, log) lives in C:\ProgramData\NightGuard and survives upgrades.
+  - Smart App Control: NightGuard isn't code-signed, so with Smart App Control on, Windows blocks the
+    service and setup would fail at "Starting services". Setup checks first and explains how to turn it
+    off (NG_SmartAppControlDlg). Evaluation mode gets a heads-up but may continue.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util"
@@ -85,6 +88,43 @@
       <Custom Action="NG_Cleanup" After="StopServices" Condition="REMOVE~=&quot;ALL&quot; AND UPGRADINGPRODUCTCODE" />
       <Custom Action="NG_CleanupPurge" After="NG_Cleanup" Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
     </InstallExecuteSequence>
+
+    <!-- Smart App Control state: 1 = on (blocks unsigned apps), 2 = evaluation, 0 / missing = off -->
+    <Property Id="NG_SAC">
+      <RegistrySearch Id="NG_SACSearch" Root="HKLM" Key="SYSTEM\CurrentControlSet\Control\CI\Policy"
+                      Name="VerifiedAndReputablePolicyState" Type="raw" Bitness="always64" />
+    </Property>
+
+    <UI>
+      <Dialog Id="NG_SmartAppControlDlg" Width="370" Height="270" Title="NightGuard Setup">
+        <Control Id="Title" Type="Text" X="20" Y="12" Width="330" Height="18" Transparent="yes" NoPrefix="yes"
+                 Text="{\WixUI_Font_Title}One quick thing first: Smart App Control" />
+        <Control Id="OnText" Type="Text" X="20" Y="36" Width="330" Height="40" NoPrefix="yes" HideCondition="NG_SAC&lt;&gt;&quot;#1&quot;"
+                 Text="Windows' Smart App Control is on. It blocks every app that isn't code-signed, and NightGuard isn't: signing costs about $10 a month, every month, and NightGuard is free. So right now Windows would block NightGuard and this setup would fail." />
+        <Control Id="EvalText" Type="Text" X="20" Y="36" Width="330" Height="40" NoPrefix="yes" HideCondition="NG_SAC=&quot;#1&quot;"
+                 Text="Windows' Smart App Control is in evaluation mode. If it switches itself on later, it will block NightGuard (it isn't code-signed: that costs about $10 a month, and NightGuard is free), and your bouncer quietly clocks out. Turning it off first is the safe bet." />
+        <Control Id="TrustText" Type="Text" X="20" Y="80" Width="330" Height="20" NoPrefix="yes"
+                 Text="Not sure about that? Fair. NightGuard's full source code is public, so you (or a nerdy friend) can read exactly what it does:" />
+        <Control Id="Link" Type="Hyperlink" X="20" Y="101" Width="330" Height="12"
+                 Text="&lt;a href=&quot;https://github.com/Omidz/NightGuard&quot;&gt;github.com/Omidz/NightGuard&lt;/a&gt;" />
+        <Control Id="StepsText" Type="Text" X="20" Y="120" Width="330" Height="60" NoPrefix="yes"
+                 Text="How to turn it off (about 30 seconds):&#xD;&#xA;1. Open Start, type Windows Security and open it.&#xD;&#xA;2. Go to App and browser control, then Smart App Control settings.&#xD;&#xA;3. Choose Off and confirm.&#xD;&#xA;4. Run this NightGuard setup again." />
+        <Control Id="WarnText" Type="Text" X="20" Y="184" Width="330" Height="40" NoPrefix="yes"
+                 Text="Heads-up: on most PCs, Windows can't switch Smart App Control back on without resetting Windows. Microsoft Defender antivirus and SmartScreen keep protecting you either way. Your PC, your call." />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Continue" Type="PushButton" X="200" Y="243" Width="82" Height="17" Text="Continue anyway"
+                 HideCondition="NG_SAC=&quot;#1&quot;">
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+        <Control Id="Close" Type="PushButton" X="290" Y="243" Width="66" Height="17" Default="yes" Cancel="yes" Text="Close setup">
+          <Publish Event="EndDialog" Value="Exit" />
+        </Control>
+      </Dialog>
+      <InstallUISequence>
+        <Show Dialog="NG_SmartAppControlDlg" Before="WelcomeEulaDlg"
+              Condition="NOT Installed AND (NG_SAC=&quot;#1&quot; OR NG_SAC=&quot;#2&quot;)" />
+      </InstallUISequence>
+    </UI>
 
     <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
     <ui:WixUI Id="WixUI_Minimal" />
