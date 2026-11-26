@@ -326,7 +326,7 @@
                         <TextBlock Text="When time's up, the PC will..." Style="{StaticResource H2}" Margin="0,0,0,12" />
                         <WrapPanel x:Name="ActionsPanel" />
                         <TextBlock Text="Last call before it happens" Style="{StaticResource H2}" Margin="0,12,0,4" />
-                        <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,10" Text="A full-screen countdown with a &quot;Let me save first&quot; button." />
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,10" Text="A full-screen countdown, even over your game, with a button to skip the wait." />
                         <local:PillPicker x:Name="CountdownPills" />
                         <Expander Header="More options" Margin="0,18,0,0" FontSize="14">
                             <StackPanel Margin="4,12,0,4">

@@ -47,7 +47,7 @@ Needs 64-bit Windows 10 or 11. Nothing else to install: the installer brings eve
 ### 🌙 What happens tonight
 
 - **30, 10 and 5 minutes before bedtime:** a popup (with a sound) jumps in front of whatever you're doing and tells you to wrap up and save. The final call reminds you of your why and your plan.
-- **At bedtime:** a full-screen 60-second countdown (even over your game; shrink it to save first), then the PC hibernates. Your open stuff is saved to disk, usually.
+- **At bedtime:** a full-screen 60-second countdown (even over your game), then the PC hibernates. Your open stuff is saved to disk, usually.
 - **Switch it back on before unlock time?** About a minute later: countdown, hibernate. Repeat until you give up and sleep. 😴
 - **After unlock time:** your PC is back to normal, and your apps are where you left them. Waking it from last night's hibernate won't set off a leftover countdown: anything NightGuard started before the PC went to sleep is cancelled on wake-up, and it double-checks the clock before it ever acts.
 - **Your first sign-in of the day:** a morning check-in pops up to congratulate you (or gently roast you), shows your streak, and lets you log your mood. Or just click Skip.
@@ -327,7 +327,7 @@ Set your own bedtime and unlock time per night. Any time works, as long as there
 With Shutdown, yes, after the countdown. With Hibernate (the default) your game is usually still there when you switch the PC back on, but don't bet your save file on it. That's why there are warnings. Save at the 5-minute warning. 🙂
 
 **Will the warnings show up over my fullscreen game?**
-The bedtime countdown will. It takes over the whole screen your game is on, and if a game in *exclusive* fullscreen keeps it hidden, NightGuard minimises the game. Need to save? Click "Let me save first" and it shrinks to a small bar on top of the screen while you save; 10 seconds before the end it takes over the screen again (and closing it doesn't stop it). Done already and don't want to wait? Click "Shut down now" (or "Hibernate now", and so on) twice, and it happens straight away. The earlier warnings are always-on-top popups that pull themselves to the front, with a sound and a Windows notification as backup. They get through *borderless* fullscreen (most games today); in *exclusive* fullscreen you'll at least hear them. Tip: switch your game to borderless or windowed fullscreen to see every warning.
+The bedtime countdown will. It takes over the whole screen your game is on, and if a game in *exclusive* fullscreen keeps it hidden, NightGuard minimises the game. It stays full screen until the end, and closing it doesn't stop it. Done already and don't want to wait? Click "Shut down now" (or "Hibernate now", and so on) twice, and it happens straight away. The earlier warnings are always-on-top popups that pull themselves to the front, with a sound and a Windows notification as backup. They get through *borderless* fullscreen (most games today); in *exclusive* fullscreen you'll at least hear them. Tip: switch your game to borderless or windowed fullscreen to see every warning.
 
 **Can I delete the installer I downloaded?**
 Yes. NightGuard is installed in `C:\Program Files\NightGuard` and runs from there.
