@@ -13,20 +13,15 @@ namespace NightGuard.App;
 /// The bedtime countdown, built to get through to someone mid-game:
 ///  - It takes over the whole screen the game is on. If a game in exclusive fullscreen keeps it
 ///    hidden, the game is minimised (it's about to be shut down anyway).
-///  - "Let me save first" swaps it for a small always-on-top bar (its own window) so you can save.
-///  - With 10 seconds left it takes over the screen again. It can't be dismissed: closing it just
-///    turns it back into the bar.
+///  - It stays full screen until the end, and can't be closed (Alt+F4 does nothing).
 ///  - "Shut down now" (or hibernate, sleep...) skips the wait: two clicks, so it's never an accident.
 /// It's only a heads-up: the service does the bedtime action when time is up, whatever happens here.
 /// </summary>
 public partial class CountdownWindow : Window
 {
-    private const int FinalSeconds = 10;
-
     private int _left;
     private readonly bool _preview;
     private readonly string _actionWord;
-    private bool _pill;
     private bool _done;
     private IntPtr _hwnd;
     private IntPtr _game;            // a fullscreen window that was in front when the countdown started
@@ -34,7 +29,6 @@ public partial class CountdownWindow : Window
     private readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _front = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private readonly Func<Task<bool>>? _actNow;
-    private CountdownBar? _bar;
     private DateTime _armedUntil = DateTime.MinValue;
 
     /// <summary>The button text for doing the bedtime action right away.</summary>
@@ -76,19 +70,18 @@ public partial class CountdownWindow : Window
         UpdateText();
 
         _tick.Tick += (_, _) => Tick();
-        _front.Tick += (_, _) => { if (!_pill) StayOnTop.Front(this, activate: true); };
+        _front.Tick += (_, _) => StayOnTop.Front(this, activate: true);
         SourceInitialized += (_, _) => Setup();
         ContentRendered += (_, _) => Begin();
         Closing += OnClosing;
         KeyDown += (_, e) => { if (_preview && e.Key == System.Windows.Input.Key.Escape) ForceClose(); };
-        Closed += (_, _) => { _tick.Stop(); _front.Stop(); _bar?.CloseForGood(); };
+        Closed += (_, _) => { _tick.Stop(); _front.Stop(); };
     }
 
     /// <summary>Closes it for real (a newer countdown replaces it, or the app is exiting).</summary>
     public void ForceClose()
     {
         _done = true;
-        _bar?.CloseForGood();
         Close();
     }
 
@@ -137,48 +130,17 @@ public partial class CountdownWindow : Window
         }
         UpdateText();
         if (DateTime.UtcNow > _armedUntil && ActNowButton.IsEnabled) ActNowButton.Content = ActNowLabel(_actionWord);
-        if (_pill && _left == FinalSeconds)
-        {
-            // Last call: take over the screen again
-            ShowFull();
-            SystemSounds.Exclamation.Play();
-            BreakThrough();
-        }
     }
 
     private void UpdateText()
     {
         Seconds.Text = _left.ToString();
         Line.Text = $"This PC will {_actionWord} in {_left} second{(_left == 1 ? "" : "s")}.";
-        _bar?.Update(_left, _actionWord);
-        var canShrink = _left > FinalSeconds;
-        SaveFirstButton.Visibility = canShrink ? Visibility.Visible : Visibility.Collapsed;
-        SmallPrint.Text = canShrink
-            ? $"Need to save? Shrink this to a little bar on top. It comes back {FinalSeconds} seconds before the end."
-            : "Closing this window doesn't stop it. Sweet dreams! \U0001F319";
+        SmallPrint.Text = "Closing this window doesn't stop it. Sweet dreams! \U0001F319";
     }
 
-    private void ShowFull()
-    {
-        _pill = false;
-        _bar?.Hide();
-        if (!IsVisible) Show();
+    private void ShowFull() =>
         SetWindowPos(_hwnd, new IntPtr(-1), _screen.X, _screen.Y, _screen.Width, _screen.Height, 0x0040 /* SWP_SHOWWINDOW */);
-    }
-
-    /// <summary>Swaps the full screen for the little bar, so you can save.</summary>
-    private void ShowBar()
-    {
-        if (_left <= FinalSeconds) return;
-        _pill = true;
-        _bar ??= new CountdownBar(ActNowLabel(_actionWord), ShowFull, ActNowFromBarAsync);
-        var dpi = VisualTreeHelper.GetDpi(this);
-        _bar.ShowAt((_screen.X + _screen.Width / 2.0) / dpi.DpiScaleX, _screen.Y / dpi.DpiScaleY + 12);
-        _bar.Update(_left, _actionWord);
-        Hide();
-    }
-
-    private void SaveFirst_Click(object sender, RoutedEventArgs e) => ShowBar();
 
     // ---- Do it now: first click arms the button, a second click within 4 seconds confirms ----
     private async void ActNow_Click(object sender, RoutedEventArgs e)
@@ -192,8 +154,6 @@ public partial class CountdownWindow : Window
         await ActNowAsync();
     }
 
-    private async Task<bool> ActNowFromBarAsync() => await ActNowAsync();
-
     private async Task<bool> ActNowAsync()
     {
         _armedUntil = DateTime.MinValue;
@@ -201,7 +161,6 @@ public partial class CountdownWindow : Window
         {
             Line.Text = "In a real countdown, this would happen right now. \U0001F44D";
             ActNowButton.Content = ActNowLabel(_actionWord);
-            if (_pill) ShowFull();
             return true;
         }
         ActNowButton.IsEnabled = false;
@@ -218,9 +177,7 @@ public partial class CountdownWindow : Window
     private void OnClosing(object? sender, CancelEventArgs e)
     {
         if (_done || _preview) return;
-        // Can't be dismissed, only shrunk (and only until the last 10 seconds)
-        e.Cancel = true;
-        ShowBar();
+        e.Cancel = true;   // can't be dismissed; the countdown goes on
     }
 
     // ---- Win32 ----
