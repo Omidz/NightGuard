@@ -1,0 +1,74 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Core tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet test tests/NightGuard.Core.Tests -c Release
+
+  windows:
+    name: Build app, service and MSI (Windows)
+    runs-on: windows-latest
+    permissions:
+      contents: write   # only used to attach the MSI to a release on v* tags
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Version
+        id: version
+        shell: pwsh
+        run: |
+          $v = "2.0.${{ github.run_number }}"   # every CI build upgrades the previous one
+          if ($env:GITHUB_REF -like 'refs/tags/v*') { $v = $env:GITHUB_REF_NAME.TrimStart('v') }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Build and test
+        run: |
+          dotnet build NightGuard.sln -c Release
+          dotnet test tests/NightGuard.Core.Tests -c Release --no-build
+
+      - name: Publish (self-contained, no .NET install needed)
+        shell: pwsh
+        run: |
+          $out = Join-Path $pwd 'out\publish'
+          $common = @('-c', 'Release', '-r', 'win-x64', '--self-contained', 'true', '-p:DebugType=none', "-p:Version=${{ steps.version.outputs.version }}", '-o', $out)
+          dotnet publish src/NightGuard.App @common
+          dotnet publish src/NightGuard.Service @common
+          Get-ChildItem $out -Filter 'NightGuard*.exe' | Format-Table Name, Length
+
+      - name: Build MSI
+        shell: pwsh
+        run: |
+          $pub = (Join-Path $pwd 'out\publish') + '\'
+          dotnet build installer/NightGuard.Installer.wixproj -c Release -p:PublishDir=$pub -p:ProductVersion=${{ steps.version.outputs.version }} -o out\msi
+          Get-ChildItem out\msi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NightGuard-msi
+          path: out/msi/*.msi
+          if-no-files-found: error
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/msi/NightGuard.msi

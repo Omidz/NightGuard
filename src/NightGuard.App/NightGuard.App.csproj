@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    NightGuard.exe: the settings window, and (with -agent) the small tray app the service runs in
+    every signed-in session to show warnings, the bedtime countdown and the morning check-in.
+    It never enforces anything itself; closing or killing it doesn't stop NightGuard.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>NightGuard.App</RootNamespace>
+    <AssemblyName>NightGuard</AssemblyName>
+    <ApplicationIcon>Assets\NightGuard.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- WPF's Fluent (Windows 11) theme is still marked experimental -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+    <ServerGarbageCollector>false</ServerGarbageCollector>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- WinForms is only used for the tray icon; avoid name clashes with WPF -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\NightGuard.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NightGuard.Core\NightGuard.Core.csproj" />
+  </ItemGroup>
+</Project>

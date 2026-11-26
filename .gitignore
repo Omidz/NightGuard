@@ -14,3 +14,13 @@ firewall.sig
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# .NET build output
+bin/
+obj/
+out/
+*.user
+.vs/
+TestResults/
+*.msi
+*.wixpdb
