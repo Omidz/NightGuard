@@ -74,6 +74,61 @@ public class SelfLockTests
         Assert.Equal(looser, SelfLockRules.Loosening(o, n).Count > 0);
     }
 
+    // "You can always make it stricter, never easier" - and no sneaky ways around it.
+    [Theory]
+    [InlineData("23:00", "06:00", "22:00", "06:00", false)]   // earlier bedtime
+    [InlineData("23:00", "06:00", "21:00", "07:00", false)]   // earlier bedtime and later unlock
+    [InlineData("23:00", "06:00", "23:30", "06:00", true)]    // later bedtime
+    [InlineData("23:00", "06:00", "00:30", "06:00", true)]    // "earlier" on the clock but after midnight = later
+    [InlineData("23:00", "06:00", "11:00", "06:00", true)]    // 11:00 counts as 11 AM the next day
+    [InlineData("23:00", "06:00", "22:00", "05:30", true)]    // earlier bedtime can't buy an earlier unlock
+    [InlineData("00:30", "06:00", "23:45", "06:00", false)]   // after-midnight bedtime moved to before midnight
+    public void Night_changes(string ob, string ou, string nb, string nu, bool looser)
+    {
+        var o = Cfg(); o.Schedule["Wed"] = new NightSchedule { Enabled = true, Bedtime = ob, Unlock = ou };
+        var n = Cfg(); n.Schedule["Wed"] = new NightSchedule { Enabled = true, Bedtime = nb, Unlock = nu };
+        Assert.Equal(looser, SelfLockRules.Loosening(o, n).Count > 0);
+    }
+
+    [Fact]
+    public void More_restrictions_are_never_looser()
+    {
+        var o = Cfg();
+        o.Schedule["Fri"].Enabled = false;
+        o.Blocking.Enabled = true;
+        o.Blocking.Windows = [new BlockWindow { Days = ["Mon"], From = "09:00", To = "17:00" }];
+        o.ScreenTime.Enabled = true;
+        o.ScreenTime.GameMinutesWeekday = 0;   // no game limit yet
+        var n = o.Clone();
+        n.Schedule["Fri"].Enabled = true;                                   // lock a free night
+        n.Blocking.Sites.Add("example.org");                                // block more sites
+        n.Blocking.Windows = [new BlockWindow { Days = ["Mon", "Tue"], From = "08:00", To = "18:00" }];   // longer, more days
+        n.ScreenTime.GameMinutesWeekday = 45;                               // add a game limit
+        n.ScreenTime.ScreenMinutesWeekday = 120;                            // less screen time
+        n.CountdownSeconds = 30;                                            // shorter countdown
+        n.NightModeMinutes = 120;                                           // longer night mode
+        n.EndDate = null;                                                   // no end date = runs for good
+        Assert.Empty(SelfLockRules.Loosening(o, n));
+    }
+
+    [Fact]
+    public void Less_restriction_is_caught()
+    {
+        var o = Cfg();
+        o.Blocking.Enabled = true;
+        o.Blocking.Windows = [new BlockWindow { Days = ["Mon", "Tue"], From = "22:00", To = "02:00" }];
+        o.ScreenTime.Enabled = true;
+        var n = o.Clone();
+        n.Blocking.Windows = [new BlockWindow { Days = ["Mon"], From = "22:00", To = "02:00" }];   // dropped Tuesday
+        Assert.Contains("blocking time slots cover less time", SelfLockRules.Loosening(o, n));
+        n = o.Clone();
+        n.ScreenTime.ScreenMinutesWeekday = 0;   // screen limit removed
+        Assert.Contains("more screen time on weekdays", SelfLockRules.Loosening(o, n));
+        n = o.Clone();
+        n.EndDate = "2030-01-01";   // adding an end date means it stops one day
+        Assert.Contains("new end date", SelfLockRules.Loosening(o, n));
+    }
+
     [Fact]
     public void Unlock_cool_off()
     {

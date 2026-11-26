@@ -166,7 +166,8 @@ Turn them on in the Game and screen time step. **Game time** and **screen time**
 ## 🔒 No easy take-backs (the self-lock)
 
 - **Opening NightGuard again** shows that it's on duty, when its last night is, and what you can change. It never offers a quick uninstall, and Uninstall in Windows Settings is switched off (it points you back to the app).
-- **Stricter changes save right away:** earlier bedtime, more nights, more blocked sites, less game time, a stronger bedtime action.
+- **Stricter changes save right away, any time after setup:** an earlier bedtime (11 PM to 10 PM, say), a later unlock, more nights, more blocked sites or longer blocking slots, less game or screen time, a stronger bedtime action. You can always make it harder.
+- **While you edit, NightGuard tells you live** which it is: ✅ "same or stricter, saves right away", or 🚧 "looser than now", with the night or setting that's looser.
 - **Looser changes need an unlock:** later bedtime, fewer nights, removing blocks, more game time, a weaker action, a longer countdown. NightGuard lists what's looser and offers to request an unlock.
 - **The unlock has a 7-day cool-off.** After it, you have 3 days to make looser changes or uninstall, once. Then it locks again. You can cancel a request anytime.
 - **Uninstall** works the same way: "Request uninstall" (bottom left) starts the cool-off. When it's over, you get one last ARE YOU SURE?
